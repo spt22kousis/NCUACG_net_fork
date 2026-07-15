@@ -1,4 +1,4 @@
-﻿import { useState ,useEffect} from 'react';
+import { useState ,useEffect} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { User } from '../contexts/AuthContext';
@@ -67,9 +67,28 @@ export default function Login() {
            }
     });
     setUser(meRes.data);
+    // 登入成功後延遲 1 秒跳轉到首頁
+    setTimeout(() => {
+      navigate('/');
+    }, 1000);
   } catch (err: any) {
-    setMessage(err.response?.data?.message || '發生錯誤');
-    console.log(err.response?.data?.message)
+    const data = err.response?.data;
+    if (data && typeof data === 'object' && !data.message) {
+      // 處理 DRF 預設的格式 {"useremail": ["你尚未驗證email"]}
+      const firstError = Object.values(data)[0];
+      if (Array.isArray(firstError)) {
+        setMessage(String(firstError[0]));
+        return;
+      }
+    }
+    // 處理像之前 {'useremail': [ErrorDetail(...)]} 被轉成字串的情況 (雖然我們也會改後端，但以防萬一)
+    let errorStr = data?.message || '發生錯誤';
+    if (errorStr.includes("ErrorDetail")) {
+      const match = errorStr.match(/string='([^']+)'/);
+      if (match) errorStr = match[1];
+    }
+    setMessage(errorStr);
+    console.log(errorStr);
   }
   }
   const [showPassword, setShowPassword] = useState(false);

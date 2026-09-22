@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useChatContext } from '../contexts/ChatContext';
 import ChatBubble from '../components/ChatBubble';
 import PersonaSwitch from '../components/PersonaSwitch';
+import { ASSISTANT_ENABLED } from '../config';
 import './AssistantChat.css';
 
 const PERSONA_LS_KEY = 'ncuacg.personaId';
@@ -49,6 +50,34 @@ export default function AssistantChat() {
       e.stopPropagation();
     }
   };
+
+  // 後端的 assistant app 目前未啟用，直接顯示維護中，不要送出會失敗的請求。
+  // Hook 必須全部跑完才能提前 return，所以這段放在這裡而不是元件開頭。
+  if (!ASSISTANT_ENABLED) {
+    return (
+      <section
+        className="chat-container chat-shell"
+        style={{
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          textAlign: 'center',
+          gap: '0.75rem',
+          padding: '1.5rem',
+        }}
+      >
+        <div style={{ fontSize: '2.5rem', lineHeight: 1 }} aria-hidden="true">
+          🛠️
+        </div>
+        <h2 style={{ margin: 0, fontSize: '1.1rem' }}>AI 助理維護中</h2>
+        <p style={{ margin: 0, color: '#666', fontSize: '0.9rem', maxWidth: '20rem' }}>
+          目前正在整修，暫時無法使用。其他功能不受影響，稍後再來看看吧！
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section

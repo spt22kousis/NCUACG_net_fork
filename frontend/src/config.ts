@@ -5,3 +5,8 @@
 // 預設走相對路徑 /api，開發時由 vite.config.ts 的 proxy 轉給 Django。
 export const API_BASE: string = import.meta.env.VITE_API_BASE || '/api';
 
+// AI 助理目前在後端是關閉的（assistant app 未掛載，且缺 sentence-transformers
+// 與 GROQ_API_KEY）。關閉時前端顯示「維護中」，不會真的去打 API。
+// 後端準備好後，在 .env 設 VITE_ASSISTANT_ENABLED=true 即可開啟。
+export const ASSISTANT_ENABLED: boolean =
+  String(import.meta.env.VITE_ASSISTANT_ENABLED ?? '').toLowerCase() === 'true';

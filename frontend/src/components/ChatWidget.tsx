@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 
 import AssistantChat from '../pages/AssistantChat';        // 重用聊天頁
+import { ASSISTANT_ENABLED } from '../config';
 import personasJson from '../data/personas.json';
 
 const PERSONA_LS_KEY = 'ncuacg.personaId';
@@ -141,9 +142,13 @@ export default function ChatWidget() {
         {/* 標頭：顯示當前 persona 名稱 */}
         <div style={headerStyle}>
           <strong>社網 AI 助理</strong>
-          <span style={pillStyle} title="於面板內可切換角色">
-            🤖 角色：{getPersonaName(personaId) || '（預設）'}
-          </span>
+          {ASSISTANT_ENABLED ? (
+            <span style={pillStyle} title="於面板內可切換角色">
+              🤖 角色：{getPersonaName(personaId) || '（預設）'}
+            </span>
+          ) : (
+            <span style={pillStyle}>🛠️ 維護中</span>
+          )}
         </div>
 
         {/* 主要聊天內容（含 PersonaSwitch 與訊息列表/輸入框） */}

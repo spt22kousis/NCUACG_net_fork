@@ -37,23 +37,32 @@ class LoginSerializer(serializers.Serializer):
         captcha_key = attrs.get("captcha_key")
         captcha_value = attrs.get("captcha_value")
 
-        # 驗證 Captcha
-        try:
-            captcha_obj = CaptchaStore.objects.get(hashkey=captcha_key)
-        except CaptchaStore.DoesNotExist:
-            raise serializers.ValidationError({"captcha": "Captcha expired"})
+        # 驗證 Captcha：一組驗證碼只能用一次（不論答對答錯），並且要檢查是否過期。
+        # 原本比對完沒有刪除，同一組 key + 答案可以無限重送，等於沒有擋暴力破解。
+        captcha_obj = CaptchaStore.objects.filter(hashkey=captcha_key).first()
+        if captcha_obj is None:
+            raise serializers.ValidationError({"captcha": "驗證碼已失效，請重新取得"})
 
-        if captcha_obj.response != captcha_value.lower():
-            raise serializers.ValidationError({"captcha": "Invalid Captcha"})
+        expected = captcha_obj.response
+        expired = captcha_obj.expiration <= timezone.now()
+        # 用 delete() 的回傳筆數判斷「是不是我刪掉的」：同一組 key 同時送兩次時，
+        # 只有一個請求能刪到，另一個會拿到 0，視同已失效（避免競態重複使用）
+        deleted, _ = CaptchaStore.objects.filter(pk=captcha_obj.pk).delete()
+        if deleted == 0 or expired:
+            raise serializers.ValidationError({"captcha": "驗證碼已失效，請重新取得"})
+
+        # 套件存檔時會把答案轉小寫，所以比對不分大小寫
+        if expected != captcha_value.strip().lower():
+            raise serializers.ValidationError({"captcha": "驗證碼錯誤"})
 
         # 驗證帳密
         user = User.objects.filter(email=useremail).first()
         if not user:
-            raise serializers.ValidationError({"useremail": "Invalid useremail or password"})
+            raise serializers.ValidationError({"useremail": "帳號或密碼錯誤"})
 
         cred = getattr(user, 'credential', None)
         if not cred or not bcrypt.checkpw(password.encode('utf-8'), cred.password_hash.encode('utf-8')):
-            raise serializers.ValidationError({"useremail": "Invalid useremail or password"})
+            raise serializers.ValidationError({"useremail": "帳號或密碼錯誤"})
 
         if not user.is_active:
             raise serializers.ValidationError({"useremail": "你尚未驗證email"})

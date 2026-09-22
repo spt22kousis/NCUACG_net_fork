@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { User } from '../contexts/AuthContext';
 import Sidebar from '../components/Sidebar';
+import { isAxiosError } from 'axios';
 import { api, setTokens } from '../api/client';
 import '../styles/Login.css';
 
@@ -64,24 +65,25 @@ export default function Login() {
     setTimeout(() => {
       navigate('/');
     }, 1000);
-  } catch (err: any) {
-    const data = err.response?.data;
-    if (data && typeof data === 'object' && !data.message) {
-      // 處理 DRF 預設的格式 {"useremail": ["你尚未驗證email"]}
+  } catch (err) {
+    // 驗證碼是一次性的（不論答對答錯，後端都會作廢），失敗後一定要換一張新的，
+    // 否則使用者照著畫面上的舊圖重試只會一直得到「驗證碼已失效」
+    loadCaptcha();
+
+    // 後端回 DRF 標準格式：{"captcha": ["驗證碼錯誤"]}、{"useremail": ["帳號或密碼錯誤"]}
+    const data: unknown = isAxiosError(err) ? err.response?.data : undefined;
+    if (data && typeof data === 'object') {
       const firstError = Object.values(data)[0];
-      if (Array.isArray(firstError)) {
+      if (Array.isArray(firstError) && firstError.length > 0) {
         setMessage(String(firstError[0]));
         return;
       }
+      if (typeof firstError === 'string') {
+        setMessage(firstError);
+        return;
+      }
     }
-    // 處理像之前 {'useremail': [ErrorDetail(...)]} 被轉成字串的情況 (雖然我們也會改後端，但以防萬一)
-    let errorStr = data?.message || '發生錯誤';
-    if (errorStr.includes("ErrorDetail")) {
-      const match = errorStr.match(/string='([^']+)'/);
-      if (match) errorStr = match[1];
-    }
-    setMessage(errorStr);
-    console.log(errorStr);
+    setMessage('登入失敗，請稍後再試');
   }
   }
   const [showPassword, setShowPassword] = useState(false);

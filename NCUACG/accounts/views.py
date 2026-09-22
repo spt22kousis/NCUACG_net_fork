@@ -83,25 +83,21 @@ class LoginView(generics.GenericAPIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        try:
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            user = serializer.validated_data["user"]
-            access_token = serializer.validated_data["access"]
-            refresh_token = serializer.validated_data["refresh"]
+        # 驗證失敗（驗證碼、帳密、未驗證信箱）直接讓 DRF 回標準格式：
+        #   400 {"captcha": ["驗證碼錯誤"]} / {"useremail": ["帳號或密碼錯誤"]}
+        # 原本整段包在 except Exception 裡用 str(e) 回傳，前端只能用正規表示式
+        # 從 "ErrorDetail(string='...')" 裡撈字，而且真正的程式錯誤也會被偽裝成 400。
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
 
-            logger.info(f"User '{user.name}' logged in successfully.")
-            
-            return Response({
-                "message": "Login success",
-                "access": access_token,
-                "refresh": refresh_token
-            }, status=status.HTTP_200_OK)
-        except Exception as e:
-            print(logger.error(traceback.format_exc()))
-            return Response({
-                "message": str(e),
-            }, status=400)
+        user = serializer.validated_data["user"]
+        logger.info("User id=%s logged in successfully.", user.id)
+
+        return Response({
+            "message": "登入成功",
+            "access": serializer.validated_data["access"],
+            "refresh": serializer.validated_data["refresh"],
+        }, status=status.HTTP_200_OK)
 
 
 class LogoutView(APIView):

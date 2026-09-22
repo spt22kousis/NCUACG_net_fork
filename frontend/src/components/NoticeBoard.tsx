@@ -1,4 +1,4 @@
-﻿// frontend/src/components/NoticeBoard.tsx
+// frontend/src/components/NoticeBoard.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import fallbackNotices from '../data/notices.json'; // 失敗時備援
 import '../styles/NoticeBoard.css';
@@ -128,7 +128,7 @@ const NoticeBoard: React.FC = () => {
     return (
       <div className="notice-board-container">
         <div className="notice-card-wrapper">
-          <div className="notice-card">載入中…</div>
+          <div className="notice-card empty-state">載入中…</div>
         </div>
       </div>
     );
@@ -138,7 +138,7 @@ const NoticeBoard: React.FC = () => {
     return (
       <div className="notice-board-container">
         <div className="notice-card-wrapper">
-          <div className="notice-card">目前 30 天內沒有活動</div>
+          <div className="notice-card empty-state">目前 30 天內沒有活動</div>
         </div>
       </div>
     );

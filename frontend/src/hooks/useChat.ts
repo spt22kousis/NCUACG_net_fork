@@ -88,7 +88,7 @@ export function useChat() {
         // 廣播事件，讓 ChatContext/PersonaSwitch 等即時同步
         window.dispatchEvent(new CustomEvent('persona:change', { detail: { id: used } }));
       }
-    } catch (e: any) {
+    } catch {
       setError('發送失敗，請稍後再試');
       // 也可以選擇把剛剛 push 的 user 訊息移除；這裡先保留方便除錯
       // setMessages((prev) => prev.slice(0, -1));

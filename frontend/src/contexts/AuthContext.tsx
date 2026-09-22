@@ -1,22 +1,11 @@
 // AuthContext.tsx
-import { createContext, useState, useContext, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { api, clearTokens, getAccessToken, AUTH_LOGOUT_EVENT } from '../api/client';
+import { AuthContext } from './auth';
+import type { User } from './auth';
 
-interface User {
-  id: number;
-  username: string;
-  role: 'superadmin' | 'admin' | 'member' | 'guest';
-}
-
-interface AuthContextType {
-  user: User | null;
-  setUser: React.Dispatch<React.SetStateAction<User | null>>;
-  logout: () => Promise<void>;
-  isAuthenticated: boolean;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// useAuth 與 User 型別放在 ./auth.ts（原因見該檔開頭）
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -75,12 +64,3 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth 必須在 AuthProvider 裡面使用');
-  }
-  return context;
-};
-
-export type { User };

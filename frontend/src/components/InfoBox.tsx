@@ -18,10 +18,10 @@ const normalizeAbout = (data: unknown): AboutItem[] => {
         return { source: 'about', section: idx, content: it };
       }
       // 容錯：如果已是物件且有 content 就直接使用
-      if (it && typeof it === 'object' && 'content' in (it as any)) {
-        const obj = it as any;
+      if (it && typeof it === 'object' && 'content' in it) {
+        const obj = it as { source?: unknown; section?: unknown; content?: unknown };
         return {
-          source: obj.source ?? 'about',
+          source: typeof obj.source === 'string' ? obj.source : 'about',
           section: typeof obj.section === 'number' ? obj.section : idx,
           content: String(obj.content ?? ''),
         };

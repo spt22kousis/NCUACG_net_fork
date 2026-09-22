@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronUp,
@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { isAxiosError } from 'axios';
 import { api, getAccessToken } from '../api/client';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/auth';
 import '../styles/Works.css';
 
 // 類型定義（對應後端 NCUACG/club/views.py 的輸出）
@@ -184,7 +184,7 @@ const Works: React.FC = () => {
   };
 
   // 播放器控制
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause();
@@ -193,13 +193,13 @@ const Works: React.FC = () => {
       }
       setIsPlaying(!isPlaying);
     }
-  };
+  }, [isPlaying]);
 
-  const skipTime = (seconds: number) => {
+  const skipTime = useCallback((seconds: number) => {
     if (videoRef.current) {
       videoRef.current.currentTime += seconds;
     }
-  };
+  }, []);
 
   const toggleMute = () => {
     if (videoRef.current) {
@@ -313,6 +313,14 @@ const Works: React.FC = () => {
   // 鍵盤事件處理
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
+      // 正在輸入文字（例如留言框）時不要搶走按鍵
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)
+      ) {
+        return;
+      }
       if (selectedWork?.type === 'video') {
         switch (e.key) {
           case 'ArrowLeft':
@@ -331,7 +339,7 @@ const Works: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [selectedWork?.type, isPlaying]);
+  }, [selectedWork?.type, togglePlay, skipTime]);
 
 
   return (

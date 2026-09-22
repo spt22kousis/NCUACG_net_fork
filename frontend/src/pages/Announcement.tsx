@@ -24,8 +24,8 @@ export default function Announcement() {
         const res = await api.get<EventRow[]>('/event/upcoming/', { params: { days: 30 } });
         const data = res.data;
         setEvents(Array.isArray(data) ? data : []);
-      } catch (e: any) {
-        setErr(e?.message ?? 'Failed to load events.');
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : 'Failed to load events.');
       } finally {
         setLoading(false);
       }

@@ -29,7 +29,22 @@ function parseMaybeDate(s?: string | null) {
   return isNaN(+d) ? null : d;
 }
 
-function mapApiEventsToUi(data: any[]): UiNotice[] {
+// 後端 /api/event/upcoming/ 的一筆資料
+type ApiEvent = {
+  id?: number | string;
+  title?: string;
+  description?: string | null;
+  start_time?: string | null;
+};
+
+// 本地備援 notices.json 的一筆資料
+type LocalNotice = {
+  title?: string;
+  content?: string;
+  date?: string;
+};
+
+function mapApiEventsToUi(data: ApiEvent[]): UiNotice[] {
   // 後端 /event/upcoming/ 回傳的欄位：id,title,description,location,start_time,end_time
   return (data || []).map((e) => ({
     id: e.id ?? crypto.randomUUID(),
@@ -40,9 +55,9 @@ function mapApiEventsToUi(data: any[]): UiNotice[] {
   }));
 }
 
-function mapLocalNoticesToUi(data: any[]): UiNotice[] {
+function mapLocalNoticesToUi(data: LocalNotice[]): UiNotice[] {
   // 你原本的 notices.json：title / content / date(字串)
-  return (data || []).map((n: any, idx: number) => ({
+  return (data || []).map((n, idx) => ({
     id: idx,
     title: String(n.title ?? ''),
     content: String(n.content ?? ''),
@@ -82,11 +97,11 @@ const NoticeBoard: React.FC = () => {
     async function load() {
       setLoading(true);
       try {
-        const resp = await api.get<any[]>('/event/upcoming/', { params: { days: 30 } });
+        const resp = await api.get<ApiEvent[]>('/event/upcoming/', { params: { days: 30 } });
         const mapped = keepUpcoming(mapApiEventsToUi(resp.data));
         if (!cancelled) setItems(mapped);
       } catch {
-        const mapped = keepUpcoming(mapLocalNoticesToUi(fallbackNotices as any[]));
+        const mapped = keepUpcoming(mapLocalNoticesToUi(fallbackNotices as LocalNotice[]));
         if (!cancelled) setItems(mapped);
       } finally {
         if (!cancelled) setLoading(false);

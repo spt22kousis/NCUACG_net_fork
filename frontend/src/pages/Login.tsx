@@ -1,7 +1,7 @@
 import { useState ,useEffect} from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import type { User } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/auth';
+import type { User } from '../contexts/auth';
 import Sidebar from '../components/Sidebar';
 import { isAxiosError } from 'axios';
 import { api, setTokens } from '../api/client';

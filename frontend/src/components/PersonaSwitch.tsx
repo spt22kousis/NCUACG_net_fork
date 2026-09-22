@@ -1,6 +1,6 @@
 // frontend/src/components/PersonaSwitch.tsx
 import { useMemo } from 'react';
-import { useChatContext } from '../contexts/ChatContext';
+import { useChatContext } from '../contexts/chat';
 import personasJson from '../data/personas.json';
 
 type Persona = {

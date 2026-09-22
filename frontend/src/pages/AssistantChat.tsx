@@ -1,6 +1,6 @@
 // frontend/src/pages/AssistantChat.tsx
 import { useEffect, useRef, useState } from 'react';
-import { useChatContext } from '../contexts/ChatContext';
+import { useChatContext } from '../contexts/chat';
 import ChatBubble from '../components/ChatBubble';
 import PersonaSwitch from '../components/PersonaSwitch';
 import { ASSISTANT_ENABLED } from '../config';

@@ -17,7 +17,10 @@ Including another URLconf
 # NCUACG/urls.py
 from django.contrib import admin
 from django.urls import path, include
-from accounts.views import LoginView, LogoutView, RegisterView, GetCaptcha,  VerifyRegistrationView,UserProfileView
+from accounts.views import (
+    LoginView, LogoutView, RegisterView, GetCaptcha,
+    VerifyRegistrationView, UserProfileView, CustomTokenRefreshView,
+)
 
 urlpatterns = [
     path("api/get-captcha/", GetCaptcha.as_view(), name="get_captcha"),
@@ -30,4 +33,8 @@ urlpatterns = [
     path('api/captcha/', include('captcha.urls')),
     path("api/verify-registration/", VerifyRegistrationView.as_view(), name="verify_registration"),
     path('api/me/', UserProfileView.as_view(), name='me'),
+    # Access token 過期時由前端攔截器自動續命
+    path("api/token/refresh/", CustomTokenRefreshView.as_view(), name="token_refresh"),
+    # 活動公告
+    path("api/event/", include("event.urls")),
 ]

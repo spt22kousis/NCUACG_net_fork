@@ -10,7 +10,19 @@ class User(models.Model):
     is_admin = models.BooleanField(default=False)
     is_super_admin = models.BooleanField(default=False)
     last_login = models.DateTimeField(blank=True, null=True)
-    is_authenticated=models.BooleanField(default=False)
+
+    # DRF 的 IsAuthenticated 會讀 is_authenticated / is_anonymous。
+    # 這裡刻意用 property 而不是資料庫欄位：本專案走無狀態 JWT，
+    # 「有沒有登入」由 token 是否驗得過決定。先前存成 BooleanField 的做法，
+    # 登入時設 True、登出時卻沒有設回 False，等於變成「這個人有沒有登入過」。
+    @property
+    def is_authenticated(self) -> bool:
+        return True
+
+    @property
+    def is_anonymous(self) -> bool:
+        return False
+
     def __str__(self):
         return f"{self.name} ({self.email})"
 

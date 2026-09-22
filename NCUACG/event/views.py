@@ -41,7 +41,7 @@ def upcoming_events(request):
 
     qs = (
         Event.objects
-        .filter(start_time__gte=now, start_time__lte=until)
+        .filter(is_published=True, start_time__gte=now, start_time__lte=until)
         .order_by("start_time")
     )
 

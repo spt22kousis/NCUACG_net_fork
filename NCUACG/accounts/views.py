@@ -16,13 +16,14 @@ from captcha.helpers import captcha_image_url
 from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from .verifyemail import generate_verification_token, send_verification_email
 import os
 import logging
-from accounts.serializers import RegisterSerializer,LoginSerializer
+from accounts.serializers import RegisterSerializer, LoginSerializer, CustomTokenRefreshSerializer
+from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 import traceback
 from accounts.tokentest import JWTtest
@@ -30,20 +31,9 @@ import jwt
 from django.conf import settings
 from rest_framework_simplejwt.exceptions import InvalidToken  # ←這裡
 from rest_framework.exceptions import AuthenticationFailed    # ←這裡
+from accounts.authentication import CustomJWTAuthentication
 logger = logging.getLogger(__name__)
-class CustomJWTAuthentication(JWTAuthentication):
-    def get_user(self, validated_token):
-        try:
-            user_id = validated_token['user_id']
-        except KeyError:
-            raise InvalidToken('Token contained no recognizable user identification')
 
-        try:
-            user = User.objects.get(id=user_id)
-        except User.DoesNotExist:
-            raise AuthenticationFailed('User not found', code='user_not_found')
-
-        return user
 class UserProfileView(APIView):
     authentication_classes = [CustomJWTAuthentication]
     permission_classes = [IsAuthenticated]
@@ -64,15 +54,20 @@ class UserProfileView(APIView):
                 "role": role,
             }
 
-            print(f"✅ 成功回傳資料: {response_data}")
+            # 注意：不要在這裡用 print() 輸出 emoji/中文，Windows 終端機 (cp950)
+            # 會丟 UnicodeEncodeError，被下面的 except 吞掉後整支 API 變成 500。
+            logger.info("Profile returned for user id=%s", user.id)
             return Response(response_data, status=status.HTTP_200_OK)
 
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
+        except Exception:
+            logger.error(traceback.format_exc())
             return Response({"error": "取得個人資料時發生錯誤"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class GetCaptcha(APIView):
+    # 公開端點：不驗身分，避免帶著舊 token 的人拿不到驗證碼
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
     def get(self, request):
         new_captcha = CaptchaStore.generate_key()
         image_url = captcha_image_url(new_captcha)
@@ -84,6 +79,9 @@ class GetCaptcha(APIView):
 
 class LoginView(generics.GenericAPIView):
     serializer_class = LoginSerializer
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
     def post(self, request):
         try:
             serializer = self.get_serializer(data=request.data)
@@ -107,6 +105,9 @@ class LoginView(generics.GenericAPIView):
 
 
 class LogoutView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
     def post(self, request):
         response = Response({'message': '登出成功'})
         response.delete_cookie('access_token')
@@ -116,6 +117,8 @@ class LogoutView(APIView):
 
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
+    authentication_classes = []
+    permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -125,6 +128,9 @@ class RegisterView(generics.CreateAPIView):
         
 
 class VerifyRegistrationView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+
     def get(self, request):
         token_value = request.query_params.get("token")
         token_obj = VerificationToken.objects.filter(token=token_value, is_used=False).first()
@@ -165,3 +171,8 @@ class Super_adminView(APIView):
                 return Response({"error": "已存在超級網管"}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response({"error": "超級網管密碼錯誤"}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CustomTokenRefreshView(TokenRefreshView):
+    """/api/token/refresh/ ：改用會查 accounts.User 的序列化器。"""
+    serializer_class = CustomTokenRefreshSerializer

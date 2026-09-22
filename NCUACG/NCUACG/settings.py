@@ -68,8 +68,10 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'NCUACG.urls'
 
 REST_FRAMEWORK = {
+    # 用自訂版本：內建的 JWTAuthentication 會去查 django.contrib.auth 的 User，
+    # 而本專案的使用者在 accounts.User（詳見 accounts/authentication.py）
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'accounts.authentication.CustomJWTAuthentication',
     ),
     # 讓 API 輸出的時間統一用 ISO8601（含時區偏移）
     'DATETIME_FORMAT': "%Y-%m-%dT%H:%M:%S%z",

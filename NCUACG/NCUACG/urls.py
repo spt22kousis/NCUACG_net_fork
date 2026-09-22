@@ -15,6 +15,8 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 # NCUACG/urls.py
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from accounts.views import (
@@ -37,4 +39,9 @@ urlpatterns = [
     path("api/token/refresh/", CustomTokenRefreshView.as_view(), name="token_refresh"),
     # 活動公告
     path("api/event/", include("event.urls")),
+    # 社課成果牆
+    path("api/club/", include("club.urls")),
 ]
+
+# 開發時讓 Django 直接提供上傳檔案；DEBUG=False 時這行不會生效
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

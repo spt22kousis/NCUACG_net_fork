@@ -165,6 +165,11 @@ USE_TZ = True
 # Static files
 STATIC_URL = 'static/'
 
+# 使用者上傳的檔案（成果牆的影片、圖片、縮圖）。media/ 已在 .gitignore。
+# 開發時由 Django 直接提供（見 urls.py）；正式站應交給 nginx 或雲端儲存。
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

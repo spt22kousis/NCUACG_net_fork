@@ -14,7 +14,11 @@ export default defineConfig({
             console.log('[proxy] ', req.method, req.path)
           );
         },
-      }
+      },
+      // 成果牆上傳的影片/圖片由 Django 提供（settings.MEDIA_URL）
+      '/media': {
+        target: 'http://localhost:8000',
+      },
     }
   }
 })

@@ -145,6 +145,17 @@
   position: relative;
 }
 
+/* 載入中 / 載入失敗 / 這個社課還沒有作品 */
+.works-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 320px;
+  color: #6b7280;
+  font-size: 16px;
+}
+
 /* 內容標題欄 */
 .content-header {
   display: flex;
@@ -527,6 +538,10 @@
 }
 
 .comment-like-button:hover {
+  color: #dc2626;
+}
+
+.comment-like-button-liked {
   color: #dc2626;
 }
 

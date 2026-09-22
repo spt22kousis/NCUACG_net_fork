@@ -13,6 +13,7 @@ type UiNotice = {
   content: string;
   date: string; // 顯示用
   startISO?: string | null; // 比較用（若有）
+  endISO?: string | null;   // 有結束時間的活動，結束前都算「還沒過」
 };
 
 function toLocalDateTimeString(iso: string) {
@@ -35,6 +36,7 @@ type ApiEvent = {
   title?: string;
   description?: string | null;
   start_time?: string | null;
+  end_time?: string | null;
 };
 
 // 本地備援 notices.json 的一筆資料
@@ -52,6 +54,7 @@ function mapApiEventsToUi(data: ApiEvent[]): UiNotice[] {
     content: String(e.description ?? ''),
     date: e.start_time ? toLocalDateTimeString(e.start_time) : '',
     startISO: e.start_time ?? null,
+    endISO: e.end_time ?? null,
   }));
 }
 
@@ -70,7 +73,8 @@ function keepUpcoming(items: UiNotice[]): UiNotice[] {
   const now = new Date();
   return items
     .filter((n) => {
-      const dt = parseMaybeDate(n.startISO ?? n.date);
+      // 跟後端一致：有結束時間看結束時間（進行中的活動也保留），沒有才看開始時間
+      const dt = parseMaybeDate(n.endISO ?? n.startISO ?? n.date);
       return dt ? dt >= now : true; // 沒時間就保留
     })
     .sort((a, b) => {

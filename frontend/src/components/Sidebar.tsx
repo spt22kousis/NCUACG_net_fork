@@ -102,7 +102,7 @@ const menuOptions: Option[] = [
         navigate('/club');
         break;
       case '活動資訊':
-        window.location.href = '/contact';
+        navigate('/announcement');
         break;
         
       case '登入':
@@ -121,8 +121,12 @@ const menuOptions: Option[] = [
   
     switch (item) {
       case '聲優組':
-      navigate('/club/works');
-      break;
+        // 帶上社課種類，其他社課之後有作品時才不會混在一起
+        navigate('/club/works?category=seiyuu');
+        break;
+      case '活動公告一覽':
+        navigate('/announcement');
+        break;
       default:
         break;
     }

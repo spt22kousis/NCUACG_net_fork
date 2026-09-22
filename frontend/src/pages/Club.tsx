@@ -1,5 +1,4 @@
 ﻿import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import '../styles/Club.css';
 import Sidebar from '../components/Sidebar';
 import Introduction from './Introduction';
@@ -47,7 +46,6 @@ initialHexItems.forEach(item => {
 
 const Club: React.FC = () => {
   const [activeHexId, setActiveHexId] = useState<number | null>(null);
-  const navigate = useNavigate();
   // modalContent 的類型現在是 JSON 陣列中的一個物件
   const [modalContent, setModalContent] = useState<typeof introData[0] | null>(null);
 

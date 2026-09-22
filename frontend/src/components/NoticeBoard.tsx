@@ -1,6 +1,7 @@
 // frontend/src/components/NoticeBoard.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import fallbackNotices from '../data/notices.json'; // 失敗時備援
+import { api } from '../api/client';
 import '../styles/NoticeBoard.css';
 
 const MAX_LINES = 6;
@@ -81,11 +82,8 @@ const NoticeBoard: React.FC = () => {
     async function load() {
       setLoading(true);
       try {
-        const base = import.meta.env.VITE_API_BASE || '/api';
-        const resp = await fetch(`${base}/event/upcoming/?days=30`, { credentials: 'include' });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
-        const mapped = keepUpcoming(mapApiEventsToUi(data));
+        const resp = await api.get<any[]>('/event/upcoming/', { params: { days: 30 } });
+        const mapped = keepUpcoming(mapApiEventsToUi(resp.data));
         if (!cancelled) setItems(mapped);
       } catch {
         const mapped = keepUpcoming(mapLocalNoticesToUi(fallbackNotices as any[]));

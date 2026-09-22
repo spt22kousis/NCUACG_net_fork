@@ -1,7 +1,6 @@
 // frontend/src/components/ChatWidget.tsx
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 
-import { useChatContext } from '../contexts/ChatContext'; // 與頁面共用同一份 messages
 import AssistantChat from '../pages/AssistantChat';        // 重用聊天頁
 import personasJson from '../data/personas.json';
 
@@ -17,7 +16,6 @@ type Persona = {
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
-  const { messages } = useChatContext();
 
   // personas 映射表（id -> 顯示名稱）
   const personas = useMemo(() => (Array.isArray(personasJson) ? personasJson as Persona[] : Object.values(personasJson as Record<string, Persona>)), []);

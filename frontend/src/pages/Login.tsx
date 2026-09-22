@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import type { User } from '../contexts/AuthContext';
 import Sidebar from '../components/Sidebar';
-import axios from 'axios';
+import { api, setTokens } from '../api/client';
 import '../styles/Login.css';
 
 interface CaptchaResponse {
@@ -15,14 +15,13 @@ export default function Login() {
   const navigate = useNavigate();
   const [useremail, setUseremail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const { setUser } = useAuth(); // 從 Context 取得 setUser
   const [message, setMessage] = useState('')
   const [captcha, setCaptcha] = useState<CaptchaResponse | null>(null);
   const [captchaInput, setCaptchaInput] = useState(''); // 使用者輸入
   const loadCaptcha = async () => {
     try {
-      const res = await axios.get<CaptchaResponse>("http://127.0.0.1:8000/api/get-captcha/");
+      const res = await api.get<CaptchaResponse>("/get-captcha/");
       setCaptcha(res.data);
       setCaptchaInput('');
       console.log(res.data)
@@ -42,8 +41,8 @@ export default function Login() {
     }
    try {
     // 登入
-    const loginRes = await axios.post(
-      'http://localhost:8000/api/login/',
+    const loginRes = await api.post(
+      '/login/',
       {
         useremail,
         password,
@@ -55,17 +54,11 @@ export default function Login() {
     const accessToken = loginRes.data.access;
     const refreshToken = loginRes.data.refresh;
 
-    // 存起來，key 要自己決定統一名稱
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
+    // 交給 api client 統一保管；之後每個請求的 Authorization 都由攔截器帶上
+    setTokens(accessToken, refreshToken);
+
     // 成功 → 抓 /api/me/ 更新 Context
-     
-     const token = localStorage.getItem('accessToken');
-     const meRes = await axios.get<User>('http://127.0.0.1:8000/api/me/', {
-      headers: {
-                Authorization: `Bearer ${token}`
-           }
-    });
+    const meRes = await api.get<User>('/me/');
     setUser(meRes.data);
     // 登入成功後延遲 1 秒跳轉到首頁
     setTimeout(() => {
@@ -148,7 +141,6 @@ export default function Login() {
           className="eye-icon"
         />
       </button>
-    {error && <div className='errorText'>{error}</div>}
     <p>{message}</p>
     <button className='submitButton' type="submit">登入</button>
   </form>

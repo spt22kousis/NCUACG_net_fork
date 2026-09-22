@@ -14,8 +14,7 @@ import {
   SkipForward,
   Play,
   Pause,
-  Send,
-  User
+  Send
 } from 'lucide-react';
 import '../styles/Works.css';
 
@@ -115,7 +114,6 @@ const Works: React.FC = () => {
   const [volume, setVolume] = useState<number>(100);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [showVolumeSlider, setShowVolumeSlider] = useState<boolean>(false);
-  const [currentTime, setCurrentTime] = useState<number>(0);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const courseListRef = useRef<HTMLDivElement>(null);
@@ -287,7 +285,6 @@ const Works: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [selectedWork?.type, isPlaying]);
 
-  const selectedCourseColor = courses.find(c => c.id === selectedCourse)?.color || 'blue';
 
   // [更改處] 確保 selectedWork 存在時才渲染主要內容
   if (!selectedWork) {

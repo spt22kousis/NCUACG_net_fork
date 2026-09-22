@@ -1,7 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Variants } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar.tsx';
 import NoticeBoard from './NoticeBoard.tsx';
 import InfoBox from './InfoBox.tsx';
@@ -16,7 +15,6 @@ const Home: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const [direction, setDirection] = useState(0);
   const [isAnimating, setIsAnimating] = useState(false);
-  const navigate = useNavigate();
 
   const pages = [
     {

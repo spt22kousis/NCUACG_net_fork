@@ -52,6 +52,7 @@ interface Comment {
   content: string;
   likes: number;
   isLiked: boolean;
+  canDelete: boolean; // 本人或幹部才會是 true
   createdAt: string;
 }
 
@@ -294,6 +295,20 @@ const Works: React.FC = () => {
         if (reason) return alert(reason);
       }
       alert('留言失敗，請稍後再試');
+    }
+  };
+
+  const deleteComment = async (comment: Comment) => {
+    if (!selectedWork || !window.confirm('確定要刪除這則留言嗎？')) return;
+    const workId = selectedWork.id;
+    try {
+      await api.delete(`/club/comments/${comment.id}/`);
+      setComments(prev => prev.filter(c => c.id !== comment.id));
+      setWorks(prev => prev.map(w => (w.id === workId ? { ...w, commentCount: Math.max(w.commentCount - 1, 0) } : w)));
+    } catch (err) {
+      if (isAxiosError(err) && err.response?.status === 401) askLogin('刪除留言');
+      else if (isAxiosError(err) && err.response?.status === 403) alert('只能刪除自己的留言');
+      else alert('刪除失敗，請稍後再試');
     }
   };
 
@@ -652,6 +667,15 @@ const Works: React.FC = () => {
                           >
                             {comment.isLiked ? '❤️' : '🤍'} {comment.likes}
                           </button>
+                          {comment.canDelete && (
+                            <button
+                              className="comment-delete-button"
+                              onClick={() => deleteComment(comment)}
+                              aria-label="刪除留言"
+                            >
+                              刪除
+                            </button>
+                          )}
                         </div>
                         <p className="comment-text">{comment.content}</p>
                       </div>

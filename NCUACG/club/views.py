@@ -8,6 +8,7 @@
   POST   works/<id>/like/     DELETE works/<id>/like/        按讚 / 收回（需登入）
   GET    works/<id>/comments/                        留言列表
   POST   works/<id>/comments/                        留言（需登入）
+  DELETE comments/<id>/                              刪除留言（本人或幹部）
   POST   comments/<id>/like/  DELETE comments/<id>/like/     留言按讚 / 收回（需登入）
 
 輸出欄位刻意對齊 frontend/src/pages/Works.tsx 的 Work / Comment 型別（camelCase）。
@@ -45,13 +46,23 @@ def _course_to_dict(c: Course) -> dict:
     }
 
 
-def _comment_to_dict(c: Comment) -> dict:
+def _is_officer(user) -> bool:
+    return user is not None and (user.is_admin or user.is_super_admin)
+
+
+def _can_delete_comment(user, c: Comment) -> bool:
+    """留言本人或幹部可以刪除"""
+    return user is not None and (c.user_id == user.pk or _is_officer(user))
+
+
+def _comment_to_dict(c: Comment, user=None) -> dict:
     return {
         "id": c.id,
         "username": c.user.name,
         "content": c.content,
         "likes": getattr(c, "like_count", 0),
         "isLiked": bool(getattr(c, "is_liked", False)),
+        "canDelete": _can_delete_comment(user, c),
         "createdAt": c.created_at.isoformat(),
     }
 
@@ -198,14 +209,25 @@ def work_comments(request, work_id: int):
     work = get_object_or_404(Work, pk=work_id, is_published=True)
     if request.method == "GET":
         comments = _comments_queryset(_current_user(request)).filter(work=work)
-        return Response([_comment_to_dict(c) for c in comments])
+        user = _current_user(request)
+        return Response([_comment_to_dict(c, user) for c in comments])
 
     ser = CommentCreateSerializer(data=request.data)
     ser.is_valid(raise_exception=True)
     comment = Comment.objects.create(work=work, user=request.user, content=ser.validated_data["content"])
     comment.like_count = 0
     comment.is_liked = False
-    return Response(_comment_to_dict(comment), status=status.HTTP_201_CREATED)
+    return Response(_comment_to_dict(comment, request.user), status=status.HTTP_201_CREATED)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def comment_delete(request, comment_id: int):
+    comment = get_object_or_404(Comment, pk=comment_id, work__is_published=True)
+    if not _can_delete_comment(request.user, comment):
+        return Response({"detail": "只能刪除自己的留言"}, status=status.HTTP_403_FORBIDDEN)
+    comment.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(["POST", "DELETE"])

@@ -1,6 +1,7 @@
-﻿// frontend/src/components/NoticeBoard.tsx
+// frontend/src/components/NoticeBoard.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import fallbackNotices from '../data/notices.json'; // 失敗時備援
+import { api } from '../api/client';
 import '../styles/NoticeBoard.css';
 
 const MAX_LINES = 6;
@@ -12,6 +13,7 @@ type UiNotice = {
   content: string;
   date: string; // 顯示用
   startISO?: string | null; // 比較用（若有）
+  endISO?: string | null;   // 有結束時間的活動，結束前都算「還沒過」
 };
 
 function toLocalDateTimeString(iso: string) {
@@ -28,7 +30,23 @@ function parseMaybeDate(s?: string | null) {
   return isNaN(+d) ? null : d;
 }
 
-function mapApiEventsToUi(data: any[]): UiNotice[] {
+// 後端 /api/event/upcoming/ 的一筆資料
+type ApiEvent = {
+  id?: number | string;
+  title?: string;
+  description?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+};
+
+// 本地備援 notices.json 的一筆資料
+type LocalNotice = {
+  title?: string;
+  content?: string;
+  date?: string;
+};
+
+function mapApiEventsToUi(data: ApiEvent[]): UiNotice[] {
   // 後端 /event/upcoming/ 回傳的欄位：id,title,description,location,start_time,end_time
   return (data || []).map((e) => ({
     id: e.id ?? crypto.randomUUID(),
@@ -36,12 +54,13 @@ function mapApiEventsToUi(data: any[]): UiNotice[] {
     content: String(e.description ?? ''),
     date: e.start_time ? toLocalDateTimeString(e.start_time) : '',
     startISO: e.start_time ?? null,
+    endISO: e.end_time ?? null,
   }));
 }
 
-function mapLocalNoticesToUi(data: any[]): UiNotice[] {
+function mapLocalNoticesToUi(data: LocalNotice[]): UiNotice[] {
   // 你原本的 notices.json：title / content / date(字串)
-  return (data || []).map((n: any, idx: number) => ({
+  return (data || []).map((n, idx) => ({
     id: idx,
     title: String(n.title ?? ''),
     content: String(n.content ?? ''),
@@ -54,7 +73,8 @@ function keepUpcoming(items: UiNotice[]): UiNotice[] {
   const now = new Date();
   return items
     .filter((n) => {
-      const dt = parseMaybeDate(n.startISO ?? n.date);
+      // 跟後端一致：有結束時間看結束時間（進行中的活動也保留），沒有才看開始時間
+      const dt = parseMaybeDate(n.endISO ?? n.startISO ?? n.date);
       return dt ? dt >= now : true; // 沒時間就保留
     })
     .sort((a, b) => {
@@ -81,14 +101,11 @@ const NoticeBoard: React.FC = () => {
     async function load() {
       setLoading(true);
       try {
-        const base = import.meta.env.VITE_API_BASE || '/api';
-        const resp = await fetch(`${base}/event/upcoming/?days=30`, { credentials: 'include' });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
-        const mapped = keepUpcoming(mapApiEventsToUi(data));
+        const resp = await api.get<ApiEvent[]>('/event/upcoming/', { params: { days: 30 } });
+        const mapped = keepUpcoming(mapApiEventsToUi(resp.data));
         if (!cancelled) setItems(mapped);
       } catch {
-        const mapped = keepUpcoming(mapLocalNoticesToUi(fallbackNotices as any[]));
+        const mapped = keepUpcoming(mapLocalNoticesToUi(fallbackNotices as LocalNotice[]));
         if (!cancelled) setItems(mapped);
       } finally {
         if (!cancelled) setLoading(false);
@@ -128,7 +145,7 @@ const NoticeBoard: React.FC = () => {
     return (
       <div className="notice-board-container">
         <div className="notice-card-wrapper">
-          <div className="notice-card">載入中…</div>
+          <div className="notice-card empty-state">載入中…</div>
         </div>
       </div>
     );
@@ -138,7 +155,7 @@ const NoticeBoard: React.FC = () => {
     return (
       <div className="notice-board-container">
         <div className="notice-card-wrapper">
-          <div className="notice-card">目前 30 天內沒有活動</div>
+          <div className="notice-card empty-state">目前 30 天內沒有活動</div>
         </div>
       </div>
     );

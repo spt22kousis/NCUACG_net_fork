@@ -4,9 +4,11 @@ import Start from './Start';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgetPwd from './pages/ForgetPwd';
+import VerifyEmail from './pages/VerifyEmail';
 import Announcement from './pages/Announcement';
 import Club from './pages/Club';
 import Works from './pages/Works';
+import { ComingSoon, NotFound } from './pages/StatusPage';
 // 共用 Context
 import { AuthProvider } from './contexts/AuthContext';
 import { ChatProvider } from './contexts/ChatContext';
@@ -25,7 +27,8 @@ export default function App() {
             <QuickNav />
           </aside> */}
           
-        <main style={{ flex: 1, padding: '20px' }}>
+        {/* 不要加 padding：各頁面都是 100vw / 100vh 滿版，加了會整頁多出捲軸 */}
+        <main style={{ flex: 1, minWidth: 0 }}>
           <AuthProvider>
             <Routes>
               {/* Route 之後需要加密 */}
@@ -33,12 +36,16 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Signup />} />
               <Route path="/forget-password" element={<ForgetPwd />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/announcement" element={<Announcement />} />
               <Route path="/club" element={< Club/>} />
-              <Route path="/club/works" element={<Works/>}/> {/*這裡先用模擬資料 之後要根據點選的社課種類更換 */}
+              <Route path="/club/works" element={<Works/>}/>
               {/* --- AI 助理聊天頁 --- */}
               <Route path="/assistant" element={<AssistantChat />} />
-              
+              {/* 已放進導覽列、尚未完成的功能 */}
+              <Route path="/songfest" element={<ComingSoon feature="歌謠祭平台" />} />
+              <Route path="/calendar" element={<ComingSoon feature="行事曆" />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
         </main>

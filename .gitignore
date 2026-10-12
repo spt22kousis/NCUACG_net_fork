@@ -70,3 +70,9 @@ frontend/build/
 #pictures
 .jpg
 .png
+
+# 資料庫工具（VS Code SQLTools 等）自動產生的 session 檔
+*.session.sql
+
+# 社團評鑑等內部文件，含社員資料，不進 git
+社團活動績效/

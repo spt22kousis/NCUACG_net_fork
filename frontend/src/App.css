@@ -5,6 +5,11 @@ html, body, #root {
   height: 100%;
 }
 
+/* body 是 flex 置中（index.css），#root 不設寬度會縮成內容寬 */
+#root {
+  width: 100%;
+}
+
 
 .logo {
   height: 6em;

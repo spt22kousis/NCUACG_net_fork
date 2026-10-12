@@ -1,9 +1,10 @@
 import { useState ,useEffect} from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import type { User } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/auth';
+import type { User } from '../contexts/auth';
 import Sidebar from '../components/Sidebar';
-import axios from 'axios';
+import { isAxiosError } from 'axios';
+import { api, clearTokens, setTokens } from '../api/client';
 import '../styles/Login.css';
 
 interface CaptchaResponse {
@@ -15,14 +16,16 @@ export default function Login() {
   const navigate = useNavigate();
   const [useremail, setUseremail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const { setUser } = useAuth(); // 從 Context 取得 setUser
   const [message, setMessage] = useState('')
   const [captcha, setCaptcha] = useState<CaptchaResponse | null>(null);
   const [captchaInput, setCaptchaInput] = useState(''); // 使用者輸入
+  // 帳密正確但信箱還沒驗證：顯示「重寄驗證信」按鈕
+  const [unverified, setUnverified] = useState(false);
+  const [resending, setResending] = useState(false);
   const loadCaptcha = async () => {
     try {
-      const res = await axios.get<CaptchaResponse>("http://127.0.0.1:8000/api/get-captcha/");
+      const res = await api.get<CaptchaResponse>("/get-captcha/");
       setCaptcha(res.data);
       setCaptchaInput('');
       console.log(res.data)
@@ -40,10 +43,13 @@ export default function Login() {
       setMessage("你的帳號密碼咧?");
       return;
     }
+   setUnverified(false);
+   // 登入成功、token 已存起來之後，若 /me/ 失敗要把 token 收回，避免「畫面說失敗、其實半登入」
+   let tokensSaved = false;
    try {
     // 登入
-    const loginRes = await axios.post(
-      'http://localhost:8000/api/login/',
+    const loginRes = await api.post(
+      '/login/',
       {
         useremail,
         password,
@@ -55,42 +61,61 @@ export default function Login() {
     const accessToken = loginRes.data.access;
     const refreshToken = loginRes.data.refresh;
 
-    // 存起來，key 要自己決定統一名稱
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
+    // 交給 api client 統一保管；之後每個請求的 Authorization 都由攔截器帶上
+    setTokens(accessToken, refreshToken);
+    tokensSaved = true;
+
     // 成功 → 抓 /api/me/ 更新 Context
-     
-     const token = localStorage.getItem('accessToken');
-     const meRes = await axios.get<User>('http://127.0.0.1:8000/api/me/', {
-      headers: {
-                Authorization: `Bearer ${token}`
-           }
-    });
+    const meRes = await api.get<User>('/me/');
     setUser(meRes.data);
     // 登入成功後延遲 1 秒跳轉到首頁
     setTimeout(() => {
       navigate('/');
     }, 1000);
-  } catch (err: any) {
-    const data = err.response?.data;
-    if (data && typeof data === 'object' && !data.message) {
-      // 處理 DRF 預設的格式 {"useremail": ["你尚未驗證email"]}
+  } catch (err) {
+    // 驗證碼是一次性的（不論答對答錯，後端都會作廢），失敗後一定要換一張新的，
+    // 否則使用者照著畫面上的舊圖重試只會一直得到「驗證碼已失效」
+    loadCaptcha();
+
+    if (tokensSaved) {
+      clearTokens();
+      setMessage('讀取個人資料失敗，請稍後重新登入');
+      return;
+    }
+
+    // 後端回 DRF 標準格式：{"captcha": ["驗證碼錯誤"]}、{"useremail": ["帳號或密碼錯誤"]}
+    const data: unknown = isAxiosError(err) ? err.response?.data : undefined;
+    if (data && typeof data === 'object') {
+      if ('unverified' in data) setUnverified(true);
       const firstError = Object.values(data)[0];
-      if (Array.isArray(firstError)) {
+      if (Array.isArray(firstError) && firstError.length > 0) {
         setMessage(String(firstError[0]));
         return;
       }
+      if (typeof firstError === 'string') {
+        setMessage(firstError);
+        return;
+      }
     }
-    // 處理像之前 {'useremail': [ErrorDetail(...)]} 被轉成字串的情況 (雖然我們也會改後端，但以防萬一)
-    let errorStr = data?.message || '發生錯誤';
-    if (errorStr.includes("ErrorDetail")) {
-      const match = errorStr.match(/string='([^']+)'/);
-      if (match) errorStr = match[1];
-    }
-    setMessage(errorStr);
-    console.log(errorStr);
+    setMessage('登入失敗，請稍後再試');
   }
   }
+  const resendVerification = async () => {
+    setResending(true);
+    try {
+      const res = await api.post<{ message: string }>('/resend-verification/', { useremail });
+      setMessage(res.data.message);
+      setUnverified(false);
+    } catch (err) {
+      setMessage(
+        isAxiosError(err) && err.response?.status === 429
+          ? '重寄太多次了，請稍後再試'
+          : '重寄失敗，請稍後再試'
+      );
+    } finally {
+      setResending(false);
+    }
+  };
   const [showPassword, setShowPassword] = useState(false);
   return (
 
@@ -148,8 +173,12 @@ export default function Login() {
           className="eye-icon"
         />
       </button>
-    {error && <div className='errorText'>{error}</div>}
     <p>{message}</p>
+    {unverified && (
+      <button type="button" className="resend-button" onClick={resendVerification} disabled={resending}>
+        {resending ? '寄送中…' : '重寄驗證信'}
+      </button>
+    )}
     <button className='submitButton' type="submit">登入</button>
   </form>
 

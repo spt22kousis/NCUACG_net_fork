@@ -1,9 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
-import axios from 'axios';
+import { api } from '../api/client';
 export default function Signup() {
-  const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [useremail, setUserEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,11 +19,11 @@ export default function Signup() {
       setError('密碼不一致');
       return;
     }
-     await axios.post('http://localhost:8000/api/register/', {
+     await api.post('/register/', {
         name:username,
         useremail:useremail,
         password:password
-      }, { withCredentials: true }).then(res => {
+      }).then(res => {
         setMessage(res.data.message)
       })
       .catch(err => {

@@ -1,21 +1,11 @@
 // frontend/src/contexts/ChatContext.tsx
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useChat } from '../hooks/useChat'; // ⬅️ 改成具名匯入
+import { ChatCtx, PERSONA_EVENT, PERSONA_LS_KEY } from './chat';
+import type { ChatContextType } from './chat';
 
-// ---- 常數（也讓其他元件可引用） ----
-export const PERSONA_LS_KEY = 'ncuacg.personaId';
-export const PERSONA_EVENT = 'persona:change';
-
-// ---- 型別 ----
-type BaseChat = ReturnType<typeof useChat>;
-type ChatContextType = BaseChat & {
-  personaId: string;
-  setPersonaId: (id: string) => void;
-};
-
-// ---- Context ----
-const ChatCtx = createContext<ChatContextType | null>(null);
+// useChatContext、常數與型別放在 ./chat.ts（原因見該檔開頭）
 
 // ---- LocalStorage 安全封裝 ----
 function safeGetLocal(key: string): string | null {
@@ -40,9 +30,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const chat = useChat(); // { messages, sendMessage, loading, clear, ... }
 
   // 讀取預設 persona（優先：LocalStorage > 環境變數 > 空字串）
-  const defaultPersona =
-    (typeof import.meta !== 'undefined' &&
-      (import.meta as any)?.env?.VITE_DEFAULT_PERSONA) || '';
+  const defaultPersona = import.meta.env.VITE_DEFAULT_PERSONA || '';
 
   const [personaId, setPersonaIdState] = useState<string>(() => {
     return safeGetLocal(PERSONA_LS_KEY) || defaultPersona || '';
@@ -83,9 +71,3 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   return <ChatCtx.Provider value={value}>{children}</ChatCtx.Provider>;
 }
 
-// ---- Hook ----
-export function useChatContext(): ChatContextType {
-  const ctx = useContext(ChatCtx);
-  if (!ctx) throw new Error('useChatContext must be used within <ChatProvider>');
-  return ctx;
-}

@@ -1,11 +1,13 @@
 ﻿import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import '../styles/Introduction.css';
 
 // 定義新的 props 介面
 interface IntroductionContent {
   title: string;
   text: string;
+  url: string;   // 社課種類代碼，用來連到該種類的成果牆
   image?: string;
 }
 
@@ -15,6 +17,7 @@ interface IntroductionProps {
 }
 
 const Introduction: React.FC<IntroductionProps> = ({ content, onClose }) => {
+  const navigate = useNavigate();
   return (
     <AnimatePresence>
       <motion.div
@@ -44,14 +47,16 @@ const Introduction: React.FC<IntroductionProps> = ({ content, onClose }) => {
             ))}
           </div>
           
-          {/* ... 底部導航按鈕部分保持不變 ... */}
           <div className="modal-footer">
-            <button onClick={onClose}>
-              <span role="img" aria-label="back">↩️</span>
+            <button onClick={onClose} aria-label="關閉">
+              <span role="img" aria-hidden="true">↩️</span>
             </button>
-            <span className="nav-text">點擊箭頭查看更多</span>
-            <button>
-              <span role="img" aria-label="next">➡️</span>
+            <span className="nav-text">查看這個社課的成果</span>
+            <button
+              onClick={() => navigate(`/club/works?category=${content.url}`)}
+              aria-label="前往成果牆"
+            >
+              <span role="img" aria-hidden="true">➡️</span>
             </button>
           </div>
         </motion.div>

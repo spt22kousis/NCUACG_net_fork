@@ -1,5 +1,4 @@
 ﻿import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import '../styles/Club.css';
 import Sidebar from '../components/Sidebar';
 import Introduction from './Introduction';
@@ -27,6 +26,7 @@ const initialHexItems: HexItem[] = [
   { id: 22, type: 'text', label: '介' },
   { id: 34, type: 'button', label: 'MV\n剪輯', url: 'mv' },
   { id: 35, type: 'button', label: '聲優', url: 'seiyuu' },
+  { id: 36, type: 'button', label: '鐵道', url: 'railway' },
   { id: 32, type: 'text', label: '紹' },
 ];
 
@@ -47,7 +47,6 @@ initialHexItems.forEach(item => {
 
 const Club: React.FC = () => {
   const [activeHexId, setActiveHexId] = useState<number | null>(null);
-  const navigate = useNavigate();
   // modalContent 的類型現在是 JSON 陣列中的一個物件
   const [modalContent, setModalContent] = useState<typeof introData[0] | null>(null);
 
@@ -109,6 +108,22 @@ const Club: React.FC = () => {
             </div>
           );
         })}
+      </div>
+      {/* 手機版：桌機的 10 欄蜂巢排不下，只列出社課按鈕（CSS 控制只在窄螢幕顯示） */}
+      <div className="club-mobile-list">
+        <h1 className="club-mobile-title">社課介紹</h1>
+        <div className="club-mobile-grid">
+          {initialHexItems.filter(item => item.type === 'button').map(item => (
+            <button
+              key={item.id}
+              type="button"
+              className={`club-mobile-hex ${activeHexId === item.id ? 'active' : ''}`}
+              onClick={() => handleClick(item)}
+            >
+              {item.label?.replace(/\n/g, '')}
+            </button>
+          ))}
+        </div>
       </div>
       {modalContent && (
         <Introduction

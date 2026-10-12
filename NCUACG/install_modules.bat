@@ -1,14 +1,7 @@
 ﻿@echo off
-
-pip django-cors-headers==4.7.0
-pip django-simple-captcha==0.6.2
-pip djangorestframework>=3.15.0
-pip djangorestframework-simplejwt
-pip dotenv==0.9.9
-pip google==3.0.0
-pip groq>=0.9.0           # 用雲端 Groq
-pip sentence_transformers
-pip tf-keras
-pip psycopg2-binary
-pip bcrypt
+REM 在 NCUACG 資料夾執行，並先啟用 venv。
+REM 注意：不要把 pip 套件寫成 pip xxx>=1.0 這種形式，cmd 會把 > 當成輸出重導向，
+REM 結果是在資料夾裡產生名叫 1.0 的檔案（先前 repo 裡的 0.9.0、3.15.0 就是這樣來的）。
+cd /D "%~dp0"
+pip install -r requirements.txt
 pause

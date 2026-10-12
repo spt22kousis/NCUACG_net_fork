@@ -11,10 +11,14 @@ export default defineConfig({
         target: 'http://localhost:8000', // ② 後端真實位址
         configure(proxy) {
           proxy.on('proxyReq', (_, req) =>
-            console.log('[proxy] ', req.method, req.path)
+            console.log('[proxy] ', req.method, req.url)
           );
         },
-      }
+      },
+      // 成果牆上傳的影片/圖片由 Django 提供（settings.MEDIA_URL）
+      '/media': {
+        target: 'http://localhost:8000',
+      },
     }
   }
 })

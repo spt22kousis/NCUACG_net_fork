@@ -1,213 +1,141 @@
 ### NCU ACG 社團網站｜NCU ACG Club Website
 
-
-
 中央大學動畫社專屬平台，整合社團介紹、活動公告、歌謠祭資料平台、AI 助理等功能，打造專屬於動漫愛好者的互動空間。
 
+---
 
+#### 功能與進度
+
+| 功能 | 狀態 |
+| --- | --- |
+| 首頁（開場動畫、最新公告、關於社團） | ✅ 可用，支援手機 |
+| 社課介紹（各社課簡介） | ✅ 可用，介紹文字由各社課負責人撰寫 |
+| 成果牆（作品、按讚、留言） | ✅ 可用，作品目前由幹部在 Django admin 上架 |
+| 活動公告 | ✅ 可用，活動由幹部在 Django admin 新增 |
+| 註冊 / 登入 / 信箱驗證 / 重寄驗證信 | ✅ 可用 |
+| 忘記密碼 | 🚧 尚未接上後端 |
+| 行事曆 | 🚧 建置中 |
+| 歌謠祭平台（點歌、投稿、排行榜、排歌後台） | 🚧 建置中 |
+| 生成式 AI 助理 | 🛠️ 維護中（後端 assistant app 未啟用） |
 
 ---
 
+#### 技術架構
 
-
-#### 專案簡介
-
-
-
-本專案旨在為【中央大學動畫社】建立一套完整的資訊平台，提供社團成員、幹部與訪客一站式服務，功能包含：
-
-
-
-\- 首頁（最新消息、社內動態、導覽入口）
-
-\- 社課介紹（各課程成果展示與分享）
-
-\- 活動資訊（可整合 Google 日曆）
-
-\- 登入驗證 / 個人資料頁面
-
-\- 歌謠祭平台（點歌、投稿、排行榜）
-
-\- 排歌與統計後台（限排歌組、超管）
-
-\- 生成式 AI 助理（提供個性化回覆）
-
-
+- 前端：React 19 + TypeScript + Vite（`frontend/`）
+- 後端：Django + Django REST Framework + SimpleJWT（`NCUACG/`）
+- 資料庫：SQLite（開發用）
+- 前後端分離：前端所有請求都走 `/api`，開發時由 Vite proxy 轉給 `http://localhost:8000`
 
 ---
-
-
 
 #### 專案結構
 
-
-
 ```
-
-ncuacg/
-├── manage.py                         # 專案啟動點
-├── README.md                         # 說明文件
-
-├── ncuacg/                           # 主設定目錄（與專案同名）
-│   ├── __init__.py
-│   ├── settings.py                   # 設定檔（可再拆為 base/dev/prod）
-│   ├── urls.py                       # 主路由（整合各 app）
-│   ├── wsgi.py
-│   └── asgi.py
-
-├── accounts/                         # 登入 / 使用者模組
-│   ├── views.py
-│   ├── models.py
-│   ├── urls.py
-│   └── templates/accounts/
-
-├── home/                             # 首頁 + 共用導覽
-│   ├── views.py
-│   ├── urls.py
-│   └── templates/home/home.html
-
-├── club/                             # 社課介紹模組
-│   ├── views.py
-│   ├── urls.py
-│   └── templates/club/club_home.html
-
-├── event/                            # 活動資訊模組
-│   ├── views.py
-│   ├── urls.py
-│   └── templates/event/event_home.html
-
-├── templates/                        # 共用模板（navbar, base...）
-│   ├── base.html
-│   └── includes/
-│       └── navbar.html
-
-├── static/                           # 靜態資源
-│   ├── css/
-│   ├── js/
-│   └── img/
-
-├── backend_api/                      # 若使用 DRF：REST API 模組（預留）
-│   ├── views.py
-│   ├── serializers.py
-│   ├── urls.py
-│   └── ...
-
-└── .gitignore                        # Git 忽略檔案（已整理）
-
-````
-
-
+NCUACG_net/
+├── .envExample.md            # 後端 .env 範本與說明
+├── requirements-assistant.txt  # AI 助理額外需要的套件（目前未啟用）
+├── NCUACG/                   # Django 後端（manage.py 在這層）
+│   ├── NCUACG/               # 設定：settings.py、urls.py
+│   ├── accounts/             # 帳號：註冊、登入、信箱驗證、JWT
+│   ├── club/                 # 社課與成果牆：社課、作品、按讚、留言
+│   ├── event/                # 活動公告
+│   ├── assistant/            # AI 助理（目前未掛載）
+│   ├── home/                 # 預留
+│   ├── requirements.txt      # 後端必要套件
+│   └── install_modules.bat   # Windows 一鍵安裝套件
+└── frontend/                 # React 前端
+    ├── vite.config.ts        # 開發伺服器與 /api、/media proxy
+    └── src/
+        ├── api/client.ts     # 全站唯一的 HTTP 出口（自動帶 token、過期自動續命）
+        ├── config.ts         # API 位址、功能開關
+        ├── contexts/         # 登入狀態、AI 助理狀態
+        ├── components/       # 首頁區塊、側邊欄、公告欄等共用元件
+        ├── pages/            # 各頁面
+        ├── styles/           # 各頁面 CSS（*-mobile.css 為手機版覆寫）
+        └── data/             # 靜態資料（社課介紹、關於社團、公告備援）
+```
 
 ---
 
+#### 開發環境
 
+需要 Python 3.12 以上與 Node.js 20 以上。
 
-#### 開發說明
-
-
-
-##### 安裝依賴
-
-
+##### 1. 後端
 
 ```
-
+cd NCUACG
 python -m venv venv
-
-source venv/bin/activate  # Windows 請使用 venv\\Scripts\\activate
-
+venv\Scripts\activate            # macOS / Linux：source venv/bin/activate
 pip install -r requirements.txt
-
-```
-前端依賴安裝：
-```
-npm i vite // 安裝vite 因為
-
-npm run dev
-
-````
-
-
-
-##### 開發伺服器啟動
-
-
-
 ```
 
+建立 `NCUACG/.env`（跟 `manage.py` 同一層），內容照 [.envExample.md](.envExample.md)，至少要有 `DJANGO_SECRET_KEY` 與 `DJANGO_DEBUG=True`。
+
+```
+python manage.py migrate
+python manage.py createsuperuser   # 建立 Django admin 帳號（幹部上架作品、新增活動用）
 python manage.py runserver
-
 ```
 
+Windows 也可以直接執行專案根目錄的 `runserver.bat`。
 
+##### 2. 前端
+
+```
+cd frontend
+npm install
+npm run dev
+```
+
+打開 http://localhost:5173 。前端的 `/api`、`/media` 會自動轉給本機的 Django（見 `vite.config.ts`），不需要另外設定網址。
+
+##### 開發小提醒
+
+- 本機沒有接 SMTP，註冊驗證信會**印在跑 Django 的終端機**上（內容是 base64，解開後就是驗證連結）。
+- 驗證信連結會指向 `FRONTEND_ORIGIN`（沒設就是 `http://localhost:5173`）。
+- Python 套件請加進 `NCUACG/requirements.txt`，不要在 cmd 打 `pip install xxx>=1.0`：沒加引號時 `>` 會被當成輸出重導向，產生名叫 `1.0` 的垃圾檔案。
+- 送出前請跑一次 `npm run lint` 與 `npm run build`（會做 TypeScript 型別檢查）。
 
 ---
-
-
 
 #### 團隊成員與分工
-
-
 
 PM / 文件：元風，負責規格整合、時程規劃、Notion 文件管理
 
 前端：夜閃、影蒙，負責首頁切版、導覽列元件、互動樣式
 
-後端：元風、夜閃、能量、主推，負責Django 架構、登入機制、資料串接、API 建置
+後端：元風、夜閃、能量、主推，負責 Django 架構、登入機制、資料串接、API 建置
 
 UI/UX：可可，負責視覺設計、Figma 產出、元件命名風格
 
-多媒體與動畫：主推、能量，負責loading 動畫、動畫呈現（SVG / Lottie）
+多媒體與動畫：主推、能量，負責 loading 動畫、動畫呈現（SVG / Lottie）
 
-資料與內容管理：影蒙，負責Markdown 轉檔、歌曲資料轉存、格式統整
-
-
+資料與內容管理：影蒙，負責 Markdown 轉檔、歌曲資料轉存、格式統整
 
 ---
-
-
 
 #### 權限分級（簡要）
 
+\* 一般訪客：可瀏覽首頁、社課、活動頁、成果牆
 
+\* 社員登入：可按讚、留言（之後：點歌 / 投稿 / 參與投票）
 
-\* 一般訪客：可瀏覽首頁、社課、活動頁
-
-\* 社員登入：可點歌 / 投稿 / 參與投票
-
-\* 排歌組：可進入後台編輯歌單與排序
+\* 幹部 / 排歌組：可刪除任何留言（之後：進入後台編輯歌單與排序）
 
 \* 超管：全域管理者（帳號、權限、資料）
 
-
-
 ---
-
-
 
 #### 進度追蹤
 
-
-
 使用 GitHub Projects + Notion 任務板進行每週進度協作。
-
-
 
 > 最新進度請參見：\[Notion 開發進度追蹤](https://www.notion.so/216ccbce60cd8026a045e5ee044134de?v=21accbce60cd80318a00000c2a02930b\&p=222ccbce60cd80509b05cd95b25ead5b\&pm=s)
 
-
-
 ---
-
-
 
 #### 授權條款
 
-
-
 MIT License. All media / content assets used are for non-commercial and internal educational purposes.
-
-
-
----
-

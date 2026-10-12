@@ -280,3 +280,36 @@
 .sub-option-button:hover {
   background: #f1f0ff;
 }
+/* ---------------------------------------------------
+   手機版（寬度 768px 以下）
+   --------------------------------------------------- */
+@media (max-width: 768px) {
+  .sidebar-contents {
+    width: min(350px, 88vw);
+    box-sizing: border-box;
+    padding: 16px;
+  }
+
+  .menu-right-side {
+    display: block;
+  }
+
+  /* 桌機的大方塊按鈕（300×200、42px 字）在手機上會擠掉其他選項 */
+  .option-buttons {
+    width: 100%;
+    min-width: 0;
+    height: 96px;
+    font-size: 28px;
+  }
+
+  .arrow-icon {
+    font-size: 32px;
+    padding: 0 6px;
+  }
+
+  .left-subpanel {
+    right: auto;
+    max-width: calc(100vw - 32px);
+    box-sizing: border-box;
+  }
+}

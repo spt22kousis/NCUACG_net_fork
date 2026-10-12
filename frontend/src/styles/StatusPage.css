@@ -1,0 +1,55 @@
+/* 「建置中」與「找不到頁面」共用樣式 */
+.status-page {
+  /* 鋪滿整個視窗，不受外層 body/main 的 flex 與 padding 影響 */
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  box-sizing: border-box;
+  background-color: #F4F0EB;
+}
+
+.status-card {
+  width: 100%;
+  max-width: 26rem;
+  padding: 2rem 1.5rem;
+  box-sizing: border-box;
+  text-align: center;
+  color: #213547;
+  background-color: #FFFFFF;
+  border: 3px solid #000000;
+  border-radius: 16px;
+  box-shadow: 6px 6px 0 #000000;
+}
+
+.status-emoji {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.status-title {
+  margin: 1rem 0 0.5rem;
+  font-size: 1.5rem;
+}
+
+.status-message {
+  margin: 0 0 1.5rem;
+  color: #555555;
+}
+
+.status-home-link {
+  display: inline-block;
+  padding: 0.5rem 1.25rem;
+  color: #FFFFFF;
+  background-color: #007bff;
+  border: 2px solid #000000;
+  border-radius: 999px;
+}
+
+.status-home-link:hover {
+  color: #FFFFFF;
+  background-color: #0062cc;
+}

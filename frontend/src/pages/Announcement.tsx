@@ -1,6 +1,7 @@
 ﻿// frontend/src/pages/Announcement.tsx
 import { useEffect, useState } from 'react';
 import Sidebar from '../components/Sidebar';
+import { api } from '../api/client';
 
 type EventRow = {
   id: number;
@@ -18,17 +19,13 @@ export default function Announcement() {
 
   // 從後端拉「未來活動」清單（預設 30 天內）
   useEffect(() => {
-    const API_BASE = (import.meta as any).env?.VITE_API_BASE ?? '';
-    const url = `${API_BASE}/event/upcoming/?days=30`;
-
     (async () => {
       try {
-        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data: EventRow[] = await res.json();
+        const res = await api.get<EventRow[]>('/event/upcoming/', { params: { days: 30 } });
+        const data = res.data;
         setEvents(Array.isArray(data) ? data : []);
-      } catch (e: any) {
-        setErr(e?.message ?? 'Failed to load events.');
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : 'Failed to load events.');
       } finally {
         setLoading(false);
       }

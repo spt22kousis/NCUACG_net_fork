@@ -15,9 +15,14 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 # NCUACG/urls.py
+from django.conf import settings
+from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
-from accounts.views import LoginView, LogoutView, RegisterView, GetCaptcha,  VerifyRegistrationView,UserProfileView
+from accounts.views import (
+    LoginView, LogoutView, RegisterView, GetCaptcha,
+    VerifyRegistrationView, ResendVerificationView, UserProfileView, CustomTokenRefreshView,
+)
 
 urlpatterns = [
     path("api/get-captcha/", GetCaptcha.as_view(), name="get_captcha"),
@@ -29,5 +34,15 @@ urlpatterns = [
     path('api/register/', RegisterView.as_view(), name='register_user'),
     path('api/captcha/', include('captcha.urls')),
     path("api/verify-registration/", VerifyRegistrationView.as_view(), name="verify_registration"),
+    path("api/resend-verification/", ResendVerificationView.as_view(), name="resend_verification"),
     path('api/me/', UserProfileView.as_view(), name='me'),
+    # Access token 過期時由前端攔截器自動續命
+    path("api/token/refresh/", CustomTokenRefreshView.as_view(), name="token_refresh"),
+    # 活動公告
+    path("api/event/", include("event.urls")),
+    # 社課成果牆
+    path("api/club/", include("club.urls")),
 ]
+
+# 開發時讓 Django 直接提供上傳檔案；DEBUG=False 時這行不會生效
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

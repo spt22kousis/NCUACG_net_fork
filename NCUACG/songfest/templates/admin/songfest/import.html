@@ -1,0 +1,63 @@
+{% extends "admin/base_site.html" %}
+{% load admin_urls %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">首頁</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+  &rsaquo; <a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+  &rsaquo; 匯入試算表
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+  <p>
+    舊曲與播放紀錄以社團的 Google 試算表為正本。到試算表選「檔案 → 下載 → Microsoft Excel (.xlsx)」，
+    再上傳到這裡。每次匯入都會把網站資料改成跟試算表一樣，可以重複匯入。
+  </p>
+  <ul>
+    <li>兩個檔案可以只選一個；兩個都選時會先匯入歌單，播放紀錄才能對到最新的歌單。</li>
+    <li>建議先按「試跑」看看會有什麼變動，確認後再按「匯入」。</li>
+    <li>過去的場次會依播放日期自動建立（名稱是推測的，可以到「歌謠祭場次」改）。</li>
+  </ul>
+
+  {% if error %}
+    <ul class="errorlist"><li>{{ error }}</li></ul>
+  {% endif %}
+
+  {% if report %}
+    <fieldset class="module aligned">
+      <h2>結果</h2>
+      <div class="form-row">
+        <ul>
+          {% for line in report.lines %}<li>{{ line }}</li>{% endfor %}
+        </ul>
+        {% if report.warnings %}
+          <p><strong>注意</strong></p>
+          <ul>
+            {% for line in report.warnings %}<li>{{ line }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    </fieldset>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <fieldset class="module aligned">
+      {{ form.non_field_errors }}
+      {% for field in form %}
+        <div class="form-row">
+          {{ field.errors }}
+          {{ field.label_tag }} {{ field }}
+        </div>
+      {% endfor %}
+    </fieldset>
+    <div class="submit-row">
+      <input type="submit" value="試跑" class="default">
+      <input type="submit" name="_import" value="匯入">
+    </div>
+  </form>
+</div>
+{% endblock %}

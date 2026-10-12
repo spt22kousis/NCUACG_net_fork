@@ -9,5 +9,7 @@ django-simple-captcha>=0.6.2
 python-dotenv>=1.0
 # 驗證碼圖片與成果牆縮圖（ImageField）需要
 Pillow>=10.0
+# 歌謠祭：匯入 Google 試算表下載的 .xlsx
+openpyxl>=3.1
 # 只有改用 PostgreSQL 時才需要
 psycopg2-binary>=2.9

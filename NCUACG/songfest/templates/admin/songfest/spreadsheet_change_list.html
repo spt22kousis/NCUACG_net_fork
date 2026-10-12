@@ -1,0 +1,7 @@
+{% extends "admin/change_list.html" %}
+{% comment %}舊曲、播放紀錄的列表：沒有「新增」按鈕，改放「匯入試算表」{% endcomment %}
+
+{% block object-tools-items %}
+  <li><a href="import/" class="addlink">匯入試算表</a></li>
+  {{ block.super }}
+{% endblock %}

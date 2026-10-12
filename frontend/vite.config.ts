@@ -11,7 +11,7 @@ export default defineConfig({
         target: 'http://localhost:8000', // ② 後端真實位址
         configure(proxy) {
           proxy.on('proxyReq', (_, req) =>
-            console.log('[proxy] ', req.method, req.path)
+            console.log('[proxy] ', req.method, req.url)
           );
         },
       },

@@ -27,7 +27,8 @@ export default function App() {
             <QuickNav />
           </aside> */}
           
-        <main style={{ flex: 1, padding: '20px' }}>
+        {/* 不要加 padding：各頁面都是 100vw / 100vh 滿版，加了會整頁多出捲軸 */}
+        <main style={{ flex: 1, minWidth: 0 }}>
           <AuthProvider>
             <Routes>
               {/* Route 之後需要加密 */}

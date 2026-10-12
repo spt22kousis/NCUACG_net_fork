@@ -1,0 +1,186 @@
+/* ---------------------------------------------------------------
+   首頁手機版（寬度 768px 以下）
+   桌機版的版面大量使用固定 px 與絕對定位，這裡只在窄螢幕覆寫，
+   不影響桌機的設計。換頁方式見 Home.tsx（手機上下滑動）。
+   --------------------------------------------------------------- */
+@media (max-width: 768px) {
+  /* ---------- 第二頁：最新公告 ---------- */
+  /* 桌機版標題相對於一個置中的零尺寸容器定位，手機上會被公告欄蓋住；
+     改成鋪滿整頁，標題才能放到左上角 */
+  .p1-title-wrapper {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .p1-announcement-wrapper {
+    top: 11%;
+  }
+
+  .p1-outlined-text {
+    left: 24vw;
+    font-size: 10vw;
+  }
+
+  /* 裝飾用小方塊：避開左上角標題與右側換頁圓點 */
+  .p1-blue-box-small-0,
+  .p1-blue-box-small-border-0 {
+    top: 16%;
+    left: 80%;
+  }
+
+  .p1-blue-box-small-2,
+  .p1-blue-box-small-border-2 {
+    top: 82%;
+    left: 10%;
+  }
+
+  .p1-notice-wrapper {
+    position: absolute;
+    top: 21%;
+    left: 20px;
+    right: 40px; /* 右側留給換頁圓點 */
+  }
+
+  .notice-board-container {
+    width: 100%;
+    padding: 0;
+    gap: 0;
+  }
+
+  .notice-stack-back,
+  .notice-stack-middle {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 52vh;
+    box-sizing: border-box;
+  }
+
+  .notice-card-wrapper {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 52vh;
+  }
+
+  .notice-card {
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 52vh;
+    box-sizing: border-box;
+    padding: 16px;
+    font-size: 18px;
+    overflow-y: auto;
+  }
+
+  .notice-title {
+    width: auto;
+    height: auto;
+    align-self: stretch;
+    font-size: 22px;
+    white-space: normal;
+  }
+
+  .notice-nav-dots-container {
+    left: 0;
+    width: 100%;
+    margin-top: 16px;
+  }
+
+  .notice-nav-dots.active {
+    width: 48px;
+  }
+
+  .notice-nav {
+    position: static;
+    width: 100%;
+    margin-top: 12px;
+  }
+
+  .nav-button {
+    margin: 0;
+    width: 44px;
+    height: 44px;
+  }
+
+  /* ---------- 第三頁：關於社團 ---------- */
+  .p2-green-circle-big,
+  .p2-green-circle-big-border {
+    top: -45vw;
+    left: -70vw;
+    width: 130vw;
+    height: 130vw;
+  }
+
+  .p2-green-circle-big-border {
+    border-width: 6px;
+    margin: -6px 0 0 -6px;
+  }
+
+  .p2-green-circle-small-0,
+  .p2-green-circle-small-border-0 {
+    top: 64px;
+    left: 72vw;
+    width: 44px;
+    height: 44px;
+  }
+
+  .p2-green-circle-small-1,
+  .p2-green-circle-small-border-1 {
+    top: 120px;
+    left: 60vw;
+    width: 28px;
+    height: 28px;
+  }
+
+  .p2-green-circle-small-border-0,
+  .p2-green-circle-small-border-1 {
+    border-width: 5px;
+    margin: -4px 0 0 -4px;
+  }
+
+  .p2-title-wrapper {
+    position: absolute;
+    top: 72px;
+    left: 24px;
+    right: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .p2-outlined-text {
+    top: 0;
+    left: 0;
+    margin: 0;
+    font-size: 16vw;
+  }
+
+  .p2-text-border,
+  .p2-text-fill {
+    left: 0;
+  }
+
+  .p2-text-border {
+    -webkit-text-stroke: 1.6vw #000000;
+  }
+
+  .p2-notice-wrapper {
+    width: 100%;
+  }
+
+  .info-box {
+    width: 100%;
+    height: 58vh;
+    margin: 16px 0 0;
+    padding: 16px;
+    box-sizing: border-box;
+    overflow-y: auto;
+  }
+
+  .info-item {
+    font-size: 16px;
+  }
+}

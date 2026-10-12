@@ -202,3 +202,66 @@
     transform: translateX(65px);  /* 65px (32.5px*2) */
   }
 }
+/* ---------------------------------------------------
+   手機版社課列表（只在窄螢幕顯示，見 Club.tsx 的 club-mobile-list）
+   --------------------------------------------------- */
+.club-mobile-list {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .full-page-container {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+    padding: 72px 16px 32px;
+  }
+
+  /* 桌機的裝飾蜂巢在手機上排不下 */
+  .hex-grid-container {
+    display: none;
+  }
+
+  .club-mobile-list {
+    display: block;
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .club-mobile-title {
+    margin: 0 0 24px;
+    font-size: 2rem;
+    text-align: center;
+    color: #213547;
+  }
+
+  .club-mobile-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .club-mobile-hex {
+    aspect-ratio: 1 / 1.1;
+    padding: 0 6px;
+    border: none;
+    border-radius: 0;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    background: #D9D9D9;
+    color: #333;
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 1.2;
+  }
+
+  /* 錯開成蜂巢感：每排中間那個往下移 */
+  .club-mobile-hex:nth-child(3n + 2) {
+    transform: translateY(50%);
+  }
+
+  .club-mobile-hex.active,
+  .club-mobile-hex:active {
+    background: #4facfe;
+    color: #FFFFFF;
+  }
+}

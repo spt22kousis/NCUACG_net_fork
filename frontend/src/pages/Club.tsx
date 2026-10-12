@@ -109,6 +109,22 @@ const Club: React.FC = () => {
           );
         })}
       </div>
+      {/* 手機版：桌機的 10 欄蜂巢排不下，只列出社課按鈕（CSS 控制只在窄螢幕顯示） */}
+      <div className="club-mobile-list">
+        <h1 className="club-mobile-title">社課介紹</h1>
+        <div className="club-mobile-grid">
+          {initialHexItems.filter(item => item.type === 'button').map(item => (
+            <button
+              key={item.id}
+              type="button"
+              className={`club-mobile-hex ${activeHexId === item.id ? 'active' : ''}`}
+              onClick={() => handleClick(item)}
+            >
+              {item.label?.replace(/\n/g, '')}
+            </button>
+          ))}
+        </div>
+      </div>
       {modalContent && (
         <Introduction
           content={modalContent}

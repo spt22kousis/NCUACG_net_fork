@@ -9,6 +9,7 @@ import '../styles/Home-p1.css';
 import '../styles/Home-p2.css';
 import '../styles/Page-content.css';
 import '../styles/Page-navigation.css';
+import '../styles/Home-mobile.css'; // 要放最後，才能覆寫上面的桌機版樣式
 
 
 const Home: React.FC = () => {
@@ -36,35 +37,55 @@ const Home: React.FC = () => {
 
   const totalPages = pages.length;
 
+  // 換頁一律走這裡：滾輪、方向鍵、手機滑動、右側圓點都要設定方向，動畫才會往對的方向跑
+  const goToPage = (next: number) => {
+    if (isAnimating || next === currentPage || next < 0 || next >= totalPages) return;
+    setDirection(next > currentPage ? 1 : -1);
+    setCurrentPage(next);
+    setIsAnimating(true);
+  };
+
   useEffect(() => {
     const handleScroll = (e: WheelEvent) => {
       e.preventDefault();
-      if (isAnimating) return;
-
-      const next = e.deltaY > 0 ? currentPage + 1 : currentPage - 1;
-      if (next >= 0 && next < totalPages) {
-        setDirection(e.deltaY > 0 ? 1 : -1);
-        setCurrentPage(next);
-        setIsAnimating(true);
-      }
+      goToPage(currentPage + (e.deltaY > 0 ? 1 : -1));
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown' || e.key === 'PageDown') {
-        setCurrentPage(prev => Math.min(prev + 1, totalPages - 1));
+        goToPage(currentPage + 1);
       } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
-        setCurrentPage(prev => Math.max(prev - 1, 0));
+        goToPage(currentPage - 1);
       }
+    };
+
+    // 手機沒有滾輪也沒有方向鍵：上下滑動換頁
+    let touchStartY: number | null = null;
+    const handleTouchStart = (e: TouchEvent) => {
+      touchStartY = e.touches[0]?.clientY ?? null;
+    };
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (touchStartY === null) return;
+      const deltaY = touchStartY - (e.changedTouches[0]?.clientY ?? touchStartY);
+      touchStartY = null;
+      // 公告欄等可以自己捲動的區塊，讓它照常捲動、不要換頁
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('.notice-board-container, .info-box')) return;
+      if (Math.abs(deltaY) > 50) goToPage(currentPage + (deltaY > 0 ? 1 : -1));
     };
 
     window.addEventListener('wheel', handleScroll, { passive: false });
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd);
 
     return () => {
       window.removeEventListener('wheel', handleScroll);
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [currentPage, isAnimating, totalPages]);
+  });
 
   const pageVariants: Variants = {
   enter: (direction: number) => ({
@@ -241,7 +262,7 @@ const Home: React.FC = () => {
 
       {/* 導航提示 */}
         <motion.p className="navigation-hint" variants={itemVariants}>
-          {currentPage === 0 && '向下滾動或按 ↓ 鍵繼續'}
+          {currentPage === 0 && '向下滾動、滑動或按 ↓ 鍵繼續'}
           {currentPage === totalPages - 1 && '向上滾動或按 ↑ 鍵返回'}
           {currentPage > 0 && currentPage < totalPages - 1 && '使用滾輪或方向鍵導航'}
         </motion.p>
@@ -252,7 +273,8 @@ const Home: React.FC = () => {
         {pages.map((_, index) => (
           <button
             key={index}
-            onClick={() => setCurrentPage(index)}
+            onClick={() => goToPage(index)}
+            aria-label={`前往「${pages[index].title}」`}
             className={`page-nav-dots ${index === currentPage ? 'active' : ''}`} /* 當前頁面的導航圓點是否有 active 樣式 */
           />
         ))}

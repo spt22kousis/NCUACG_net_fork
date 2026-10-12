@@ -92,10 +92,15 @@ const menuOptions: Option[] = [
       // 計算子區塊的 top 和 left 位置
       const top = rect.top; 
       
-      // *** 關鍵修改：將 left 值設置為按鈕左側 - 子區塊寬度 - 間距 ***
+      // 桌機：子區塊開在按鈕左側
       const left = rect.left - subpanelWidth - spacing;
-      
-      setSubpanelPosition({ top, left });
+
+      if (left >= spacing) {
+        setSubpanelPosition({ top, left });
+      } else {
+        // 手機：側邊欄幾乎滿版，左側放不下，改成浮在按鈕上方（否則會整塊跑到螢幕外）
+        setSubpanelPosition({ top: rect.top + 16, left: rect.left + 16 });
+      }
     }
     // 開關子選單
     setActive(activeMenu === optionName ? null : optionName);
@@ -243,8 +248,11 @@ const menuOptions: Option[] = [
                             transition={{ type: 'spring', damping: 20, stiffness: 300 }}
                             className="left-subpanel"
                             style={{ 
-                              top: `${subpanelPosition.top}px`, 
-                              left: `${subpanelPosition.left}px` 
+                              top: `${subpanelPosition.top}px`,
+                              left: `${subpanelPosition.left}px`,
+                              // 項目多時不要超出螢幕底部，改成可捲動
+                              maxHeight: `calc(100vh - ${subpanelPosition.top}px - 16px)`,
+                              overflowY: 'auto',
                             }}
                           >
                             {(menuOptions.find(o => o.name === activeMenu)?.children ?? []).filter(child=>

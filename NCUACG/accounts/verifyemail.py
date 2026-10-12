@@ -6,8 +6,8 @@ def generate_verification_token():
     return secrets.token_urlsafe(32)
 
 def generate_verification_url(token):
-    #return f"{settings.FRONTEND_URL}/verify-registration/?token={token}"
-    return f"http://localhost:8000/api/verify-registration/?token={token}"
+    # 連到前端的驗證頁，由前端呼叫 API 完成驗證並顯示結果（見 frontend/src/pages/VerifyEmail.tsx）
+    return f"{settings.FRONTEND_URL}/verify-email?token={token}"
 
 def send_verification_email(user_email, token):
     url = generate_verification_url(token)

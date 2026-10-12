@@ -65,7 +65,11 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError({"useremail": "帳號或密碼錯誤"})
 
         if not user.is_active:
-            raise serializers.ValidationError({"useremail": "你尚未驗證email"})
+            # unverified 讓前端知道要顯示「重寄驗證信」按鈕
+            raise serializers.ValidationError({
+                "useremail": "你尚未驗證 email，請先點擊驗證信中的連結",
+                "unverified": "true",
+            })
 
         # 更新 last_login
         with transaction.atomic():

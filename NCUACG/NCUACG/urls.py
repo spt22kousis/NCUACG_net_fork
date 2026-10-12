@@ -21,7 +21,7 @@ from django.contrib import admin
 from django.urls import path, include
 from accounts.views import (
     LoginView, LogoutView, RegisterView, GetCaptcha,
-    VerifyRegistrationView, UserProfileView, CustomTokenRefreshView,
+    VerifyRegistrationView, ResendVerificationView, UserProfileView, CustomTokenRefreshView,
 )
 
 urlpatterns = [
@@ -34,6 +34,7 @@ urlpatterns = [
     path('api/register/', RegisterView.as_view(), name='register_user'),
     path('api/captcha/', include('captcha.urls')),
     path("api/verify-registration/", VerifyRegistrationView.as_view(), name="verify_registration"),
+    path("api/resend-verification/", ResendVerificationView.as_view(), name="resend_verification"),
     path('api/me/', UserProfileView.as_view(), name='me'),
     # Access token 過期時由前端攔截器自動續命
     path("api/token/refresh/", CustomTokenRefreshView.as_view(), name="token_refresh"),

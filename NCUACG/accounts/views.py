@@ -8,6 +8,7 @@ import bcrypt
 from accounts.models import User, Credential, VerificationToken
 from django.db import transaction
 from django.utils import timezone
+from datetime import timedelta
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -17,6 +18,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.throttling import AnonRateThrottle
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import ensure_csrf_cookie
 from .verifyemail import generate_verification_token, send_verification_email
@@ -116,49 +118,78 @@ class RegisterView(generics.CreateAPIView):
         
 
 class VerifyRegistrationView(APIView):
+    """
+    完成 email 驗證。前端驗證頁（/verify-email）用 POST {"token": ...} 呼叫；
+    GET ?token=... 保留給先前寄出、直接連到 API 的舊驗證信。
+    """
     authentication_classes = []
     permission_classes = [AllowAny]
 
     def get(self, request):
-        token_value = request.query_params.get("token")
-        token_obj = VerificationToken.objects.filter(token=token_value, is_used=False).first()
+        return self._verify(request.query_params.get("token"))
+
+    def post(self, request):
+        return self._verify(request.data.get("token"))
+
+    def _verify(self, token_value):
+        token_obj = VerificationToken.objects.filter(token=token_value, is_used=False).first() if token_value else None
 
         if not token_obj or token_obj.is_expired():
             return Response({"error": "驗證連結無效或已過期"}, status=status.HTTP_400_BAD_REQUEST)
 
         # 驗證成功
-        token_obj.is_used = True
-        token_obj.save()
-        token_obj.user.is_active = True
-        token_obj.user.save()
+        with transaction.atomic():
+            token_obj.is_used = True
+            token_obj.save(update_fields=["is_used"])
+            token_obj.user.is_active = True
+            token_obj.user.save(update_fields=["is_active"])
 
         return Response({"message": "驗證成功，註冊完成"}, status=status.HTTP_200_OK)
-    
-class Super_adminView(APIView):
+
+
+class ResendVerificationThrottle(AnonRateThrottle):
+    """同一個 IP 一小時最多重寄 5 次，避免被拿來對別人的信箱轟炸"""
+    scope = "resend_verification"
+    rate = "5/hour"
+
+
+class ResendVerificationView(APIView):
+    """
+    重寄驗證信。驗證連結 24 小時就過期，過期後沒有這支 API 帳號就卡死了。
+
+    不論信箱存不存在、是否已驗證，都回同一句話，避免被用來探測哪些信箱註冊過。
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = [ResendVerificationThrottle]
+
+    # 同一個帳號兩次重寄至少間隔多久
+    COOLDOWN = timedelta(minutes=1)
+
     def post(self, request):
-        super_admin_password = request.data.get("super_admin_password")
-        useremail = request.data.get("useremail")
-        password = request.data.get("password")
-        # 超級網管註冊
-        if super_admin_password == os.getenv("super_admin_password"):
-            if not User.objects.filter(is_super_admin=True).exists():
-                user = User.objects.filter(email=useremail).first()
-                cred = Credential.objects.filter(user=user).first()
-                if user:
-                    if bcrypt.checkpw(password.encode('utf-8'), cred.password_hash.encode('utf-8')):
-                        user.is_super_admin = True
-                        user.is_admin = True
-                        user.save()
-                        return Response({"message": "已成功成為網管"}, status=201)
-                    else:
-                        return Response({"error": "用戶密碼錯誤"}, status=status.HTTP_400_BAD_REQUEST)
-                else:
-                    return Response({"error": "此用戶不存在"}, status=status.HTTP_400_BAD_REQUEST)
-                
-            else:
-                return Response({"error": "已存在超級網管"}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            return Response({"error": "超級網管密碼錯誤"}, status=status.HTTP_400_BAD_REQUEST)
+        email = str(request.data.get("useremail", "")).strip()
+        generic = Response(
+            {"message": "如果這個信箱已註冊且尚未驗證，我們已重新寄出驗證信，請查看收件匣"},
+            status=status.HTTP_200_OK,
+        )
+        if not email:
+            return Response({"useremail": ["請輸入 email"]}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.filter(email=email, is_active=False).first()
+        if user is None:
+            return generic
+
+        latest = VerificationToken.objects.filter(user=user).order_by("-created_at").first()
+        if latest and latest.created_at > timezone.now() - self.COOLDOWN:
+            return generic
+
+        with transaction.atomic():
+            # 舊連結一律作廢，只有最新一封信的連結有效
+            VerificationToken.objects.filter(user=user, is_used=False).update(is_used=True)
+            token = generate_verification_token()
+            VerificationToken.objects.create(user=user, token=token)
+        send_verification_email(user.email, token)
+        return generic
 
 
 class CustomTokenRefreshView(TokenRefreshView):

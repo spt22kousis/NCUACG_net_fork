@@ -200,6 +200,9 @@ APPEND_SLASH = True
 # ─────────────────────────────────────────────────────────────────────────────
 # CORS 設定（整合兩分支：白名單 + 只開放必要 API 路徑）
 _FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "").strip()
+
+# 寄給使用者的連結（驗證信等）要指向前端頁面；沒設 FRONTEND_ORIGIN 時用本機 Vite
+FRONTEND_URL = (_FRONTEND_ORIGIN or "http://localhost:5173").rstrip("/")
 CORS_ALLOWED_ORIGINS = [o for o in [
     "http://localhost:5173",
     "http://127.0.0.1:5173",

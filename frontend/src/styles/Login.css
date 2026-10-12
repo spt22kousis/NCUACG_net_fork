@@ -91,6 +91,19 @@ form {
   opacity: 0.6;
   pointer-events: none;
 }
+/* 重寄驗證信（登入時信箱尚未驗證，或驗證頁連結過期時出現） */
+.resend-button {
+  padding: 8px 10px;
+  color: #007bff;
+  background-color: #fff;
+  border: 1px solid #007bff;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.resend-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
 @media (max-width: 768px) {
   .submitForm-container {
     width: 95vw;

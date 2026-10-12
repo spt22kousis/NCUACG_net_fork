@@ -4,6 +4,7 @@ import Start from './Start';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import ForgetPwd from './pages/ForgetPwd';
+import VerifyEmail from './pages/VerifyEmail';
 import Announcement from './pages/Announcement';
 import Club from './pages/Club';
 import Works from './pages/Works';
@@ -34,6 +35,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Signup />} />
               <Route path="/forget-password" element={<ForgetPwd />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/announcement" element={<Announcement />} />
               <Route path="/club" element={< Club/>} />
               <Route path="/club/works" element={<Works/>}/>

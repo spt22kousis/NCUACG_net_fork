@@ -20,6 +20,9 @@ export default function Login() {
   const [message, setMessage] = useState('')
   const [captcha, setCaptcha] = useState<CaptchaResponse | null>(null);
   const [captchaInput, setCaptchaInput] = useState(''); // 使用者輸入
+  // 帳密正確但信箱還沒驗證：顯示「重寄驗證信」按鈕
+  const [unverified, setUnverified] = useState(false);
+  const [resending, setResending] = useState(false);
   const loadCaptcha = async () => {
     try {
       const res = await api.get<CaptchaResponse>("/get-captcha/");
@@ -40,6 +43,7 @@ export default function Login() {
       setMessage("你的帳號密碼咧?");
       return;
     }
+   setUnverified(false);
    // 登入成功、token 已存起來之後，若 /me/ 失敗要把 token 收回，避免「畫面說失敗、其實半登入」
    let tokensSaved = false;
    try {
@@ -82,6 +86,7 @@ export default function Login() {
     // 後端回 DRF 標準格式：{"captcha": ["驗證碼錯誤"]}、{"useremail": ["帳號或密碼錯誤"]}
     const data: unknown = isAxiosError(err) ? err.response?.data : undefined;
     if (data && typeof data === 'object') {
+      if ('unverified' in data) setUnverified(true);
       const firstError = Object.values(data)[0];
       if (Array.isArray(firstError) && firstError.length > 0) {
         setMessage(String(firstError[0]));
@@ -95,6 +100,22 @@ export default function Login() {
     setMessage('登入失敗，請稍後再試');
   }
   }
+  const resendVerification = async () => {
+    setResending(true);
+    try {
+      const res = await api.post<{ message: string }>('/resend-verification/', { useremail });
+      setMessage(res.data.message);
+      setUnverified(false);
+    } catch (err) {
+      setMessage(
+        isAxiosError(err) && err.response?.status === 429
+          ? '重寄太多次了，請稍後再試'
+          : '重寄失敗，請稍後再試'
+      );
+    } finally {
+      setResending(false);
+    }
+  };
   const [showPassword, setShowPassword] = useState(false);
   return (
 
@@ -153,6 +174,11 @@ export default function Login() {
         />
       </button>
     <p>{message}</p>
+    {unverified && (
+      <button type="button" className="resend-button" onClick={resendVerification} disabled={resending}>
+        {resending ? '寄送中…' : '重寄驗證信'}
+      </button>
+    )}
     <button className='submitButton' type="submit">登入</button>
   </form>
 

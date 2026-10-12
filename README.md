@@ -185,6 +185,8 @@ UI/UX：可可，負責視覺設計、Figma 產出、元件命名風格
 
 #### 進度追蹤
 
+接下來要做的功能與順序見 [docs/ROADMAP.md](docs/ROADMAP.md)。
+
 使用 GitHub Projects + Notion 任務板進行每週進度協作。
 
 > 最新進度請參見：\[Notion 開發進度追蹤](https://www.notion.so/216ccbce60cd8026a045e5ee044134de?v=21accbce60cd80318a00000c2a02930b\&p=222ccbce60cd80509b05cd95b25ead5b\&pm=s)

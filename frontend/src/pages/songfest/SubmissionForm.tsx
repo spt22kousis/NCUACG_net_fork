@@ -44,6 +44,7 @@ export default function SubmissionForm({ festival, initial, ownSubmissions, onSa
   const [source, setSource] = useState<'member' | 'partner'>(sources[0] ?? 'member');
   const [fiveSec, setFiveSec] = useState(initial?.fiveSec ?? false);
   const [restrictedWork, setRestrictedWork] = useState(initial?.restrictedWork ?? false);
+  const [isBackup, setIsBackup] = useState(initial?.isBackup ?? false);
   const [duration, setDuration] = useState(initial?.duration ? formatDuration(initial.duration) : '');
   const [chainWith, setChainWith] = useState<number | null>(initial?.chainWith ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -75,11 +76,12 @@ export default function SubmissionForm({ festival, initial, ownSubmissions, onSa
       }
       if (!songLocked && fiveSec !== initial.fiveSec) input.fiveSec = fiveSec;
       if (!songLocked && restrictedWork !== initial.restrictedWork) input.restrictedWork = restrictedWork;
+      if (!songLocked && isBackup !== initial.isBackup) input.isBackup = isBackup;
       if (seconds !== initial.duration) input.duration = seconds;
       if (chainWith !== initial.chainWith) input.chainWith = chainWith;
     } else {
       for (const key of [...SONG_KEYS, ...DETAIL_KEYS]) input[key] = text[key].trim();
-      Object.assign(input, { source, fiveSec, restrictedWork });
+      Object.assign(input, { source, fiveSec, restrictedWork, isBackup: source === 'partner' && isBackup });
     }
 
     setSaving(true);
@@ -132,6 +134,12 @@ export default function SubmissionForm({ festival, initial, ownSubmissions, onSa
           <input type="checkbox" checked={fiveSec} onChange={e => setFiveSec(e.target.checked)} />
           要上傳 5 秒畫面（每報 1 首可以放 1 個 5 秒彩蛋，在活動結束的合輯影片播出）
         </label>
+        {(initial ? initial.source : source) === 'partner' && (
+          <label className="sf-check">
+            <input type="checkbox" checked={isBackup} onChange={e => setIsBackup(e.target.checked)} />
+            這首是備曲（{festival.partnerName}正選未滿 {festival.partnerLimit} 首時才會補上）
+          </label>
+        )}
         <label className="sf-check">
           <input type="checkbox" checked={restrictedWork} onChange={e => setRestrictedWork(e.target.checked)} />
           作品有公告禁止二創或有限制（例如曼迪、羚邦代理）

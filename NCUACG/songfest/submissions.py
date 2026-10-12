@@ -3,7 +3,8 @@
 新曲投稿的規則（對應「歌謠祭曲目投稿規則」）。API 與測試都從這裡呼叫，規則只寫一份。
 
   - 報曲：截止前可以新增、修改、刪除；不接受兩人報同一首歌（撞曲直接擋下）。
-  - 合作社團的新曲有上限（預設 10 首）。
+  - 合作社團（社外投稿規則）：正選上限 10 首，未滿時由「備曲」補上；跟社內撞曲時優先保留社內作品。
+  - 亂入曲（Google 表單）：每人最多 5 首、5 秒畫面每人最多 5 秒；由排歌組決定入選。
   - 窗歌：報曲截止前直接刪除；截止後標記窗歌。過了窗歌截止才窗歌，下次歌謠祭禁止報曲 1 次。
   - 繳交：填檔案連結與長度就算繳交；過了繳交截止還沒交，視同逾期窗歌（一樣記罰則）。
   - 報曲截止後要換歌、改 5 秒畫面，要找排歌組（後台修改）。
@@ -62,12 +63,22 @@ def active_submissions(festival: Festival):
     return festival.submissions.filter(withdrawn_at__isnull=True, is_rejected=False)
 
 
-def song_collision(festival: Festival, song_source: str, title: str, exclude_id=None):
-    """同一場已經有人報了同一首歌（以歌曲出處 + 曲名判斷）"""
-    qs = active_submissions(festival).filter(song_key=song_key(song_source, title))
+# 社內與社內、社外與社外撞曲時直接擋下；社外跟社內撞曲，依社外投稿規則優先保留社內，
+# 所以社內照樣可以報（社外那首會被標出來），社外則不能報社內已經報過的歌。
+BLOCKING_SOURCES = {"member": ["member"], "partner": ["member", "partner"]}
+
+GUEST_LIMIT = 5
+
+
+def song_collision(festival: Festival, song_source: str, title: str, source: str, exclude_id=None):
+    """同一場已經有人報了同一首歌（以歌曲出處 + 曲名判斷），只看會擋下 source 的那些來源"""
+    qs = active_submissions(festival).filter(
+        song_key=song_key(song_source, title), source__in=BLOCKING_SOURCES.get(source, [source])
+    )
     if exclude_id:
         qs = qs.exclude(pk=exclude_id)
-    return qs.first()
+    # 同時撞到社內與社外時先回社內那首，訊息才會是「優先保留社內」
+    return qs.filter(source="member").first() or qs.first()
 
 
 def warnings_for(sub: Submission, others: list[Submission], previous_keys: set[str], now=None) -> list[dict]:
@@ -83,15 +94,21 @@ def warnings_for(sub: Submission, others: list[Submission], previous_keys: set[s
         if other.pk == sub.pk:
             continue
         if other.song_key == sub.song_key:
-            add("songCollision", f"撞曲：{other.editor_name}〈{other.title}〉（{other.get_source_display()}）")
+            if sub.source == "partner" and other.source == "member":
+                add("songCollision", f"跟社內 {other.editor_name} 撞曲，依社外投稿規則優先保留社內作品")
+            else:
+                add("songCollision", f"撞曲：{other.editor_name}〈{other.title}〉（{_source_label(other)}）")
         elif (
             other.source != sub.source
             and normalize(sub.visual_source) not in _GENERIC_VISUALS
             and normalize(other.visual_source) == normalize(sub.visual_source)
         ):
-            add("workCollision", f"撞作品：{other.get_source_display()}的 {other.editor_name}〈{other.title}〉也用《{sub.visual_source}》")
+            add("workCollision", f"撞作品：{_source_label(other)}的 {other.editor_name}〈{other.title}〉也用《{sub.visual_source}》")
 
     if sub.source == "guest":
+        same_person = [o for o in others if o.source == "guest" and _guest_id(o) == _guest_id(sub)]
+        if len(same_person) > GUEST_LIMIT:
+            add("guestLimit", f"{sub.editor_name} 投了 {len(same_person)} 首，亂入曲每人最多 {GUEST_LIMIT} 首")
         if sub.song_key in previous_keys:
             add("playedLastTime", "上一場播過，依亂入曲規則不入選")
         deadline = sub.festival.guest_deadline
@@ -111,6 +128,34 @@ def warnings_for(sub: Submission, others: list[Submission], previous_keys: set[s
     if sub.restricted_work:
         add("restrictedWork", "作品有公告禁止二創或限制")
     return result
+
+
+def _source_label(sub: Submission) -> str:
+    return sub.festival.partner_name if sub.source == "partner" else sub.get_source_display()
+
+
+def _guest_id(sub: Submission) -> str:
+    """亂入曲投稿人：有信箱用信箱，沒有用名字"""
+    return (sub.contact_email or sub.editor_name).strip().lower()
+
+
+def five_sec_counts(active: list[Submission], now=None) -> tuple[int, int]:
+    """
+    5 秒畫面的（要放的段數, 已繳的段數）。社內、社外每首各一段；
+    亂入曲每位投稿人最多一段（每人最多 5 秒），不論投了幾首。
+    """
+    requested = uploaded = 0
+    guests_requested, guests_uploaded = set(), set()
+    for s in active:
+        if s.source == "guest":
+            if s.five_sec:
+                guests_requested.add(_guest_id(s))
+            if s.five_sec_status(now) == "uploaded":
+                guests_uploaded.add(_guest_id(s))
+        else:
+            requested += s.five_sec
+            uploaded += s.five_sec_status(now) == "uploaded"
+    return requested + len(guests_requested), uploaded + len(guests_uploaded)
 
 
 def previous_song_keys(festival: Festival) -> set[str]:
@@ -156,6 +201,7 @@ class SubmissionInput(serializers.Serializer):
     songLink = serializers.CharField(max_length=500)
     remarks = serializers.CharField(max_length=2000, required=False, allow_blank=True)
     restrictedWork = serializers.BooleanField(required=False)
+    isBackup = serializers.BooleanField(required=False)
     fiveSec = serializers.BooleanField(required=False)
     chainWith = serializers.IntegerField(required=False, allow_null=True)
     fileLink = serializers.CharField(max_length=500, required=False, allow_blank=True)
@@ -165,7 +211,7 @@ class SubmissionInput(serializers.Serializer):
     SONG_FIELDS = {
         "source": "source", "editorName": "editor_name", "songSource": "song_source",
         "visualSource": "visual_source", "title": "title", "artist": "artist",
-        "restrictedWork": "restricted_work", "fiveSec": "five_sec",
+        "restrictedWork": "restricted_work", "fiveSec": "five_sec", "isBackup": "is_backup",
     }
     DETAIL_FIELDS = {"attributes": "attributes", "songLink": "song_link", "remarks": "remarks"}
 
@@ -187,12 +233,13 @@ class SubmissionInput(serializers.Serializer):
             reason = ban_reason(self.user, self.festival, now)
             if reason:
                 raise serializers.ValidationError({"detail": reason})
-            if source == "partner":
-                count = active_submissions(self.festival).filter(source="partner").count()
+            if source == "partner" and not data.get("isBackup"):
+                count = active_submissions(self.festival).filter(source="partner", is_backup=False).count()
                 if count >= self.festival.partner_limit:
-                    raise serializers.ValidationError(
-                        {"source": f"{self.festival.partner_name}的新曲已經滿 {self.festival.partner_limit} 首"}
-                    )
+                    raise serializers.ValidationError({
+                        "source": f"{self.festival.partner_name}的新曲已經滿 {self.festival.partner_limit} 首，"
+                                  "可以改報成備曲"
+                    })
         else:
             perms = permissions(sub, now)
             if not sub.is_active:
@@ -209,17 +256,24 @@ class SubmissionInput(serializers.Serializer):
         song_source = data.get("songSource", sub.song_source if sub else "")
         title = data.get("title", sub.title if sub else "")
         song_changed = sub is None or song_key(song_source, title) != sub.song_key
-        other = song_collision(self.festival, song_source, title, exclude_id=sub.pk if sub else None)
+        source = data.get("source", sub.source if sub else "member")
+        other = song_collision(self.festival, song_source, title, source, exclude_id=sub.pk if sub else None)
         if song_changed and other is not None:
-            errors["title"] = (
-                f"這首歌 {other.editor_name} 已經報了，不接受兩人報同一首，請自行協調。"
-                "如果其實是不同首歌（例如同名的一般曲），請找排歌組。"
-            )
+            if source == "partner" and other.source == "member":
+                errors["title"] = "這首歌社內已經有人報了，依社外投稿規則優先保留社內作品，請換一首。"
+            else:
+                errors["title"] = (
+                    f"這首歌 {other.editor_name} 已經報了，不接受兩人報同一首，請自行協調。"
+                    "如果其實是不同首歌（例如同名的一般曲），請找排歌組。"
+                )
 
         if data.get("chainWith"):
             error = self._chain_error(data["chainWith"])
             if error:
                 errors["chainWith"] = error
+
+        if data.get("isBackup") and data.get("source", sub.source if sub else "member") != "partner":
+            errors["isBackup"] = "只有合作社團可以報備曲"
 
         file_link = data.get("fileLink", sub.file_link if sub else "")
         duration = data.get("duration", sub.duration_seconds if sub else None)

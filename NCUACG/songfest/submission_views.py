@@ -40,7 +40,7 @@ from rest_framework.response import Response
 from .importers import SpreadsheetError, import_guest_form
 from .models import Festival, FestivalStaff, Submission, SubmissionComment
 from .submissions import (
-    StaffUpdateInput, SubmissionInput, ban_reason, is_officer, is_staff_for, permissions,
+    StaffUpdateInput, SubmissionInput, ban_reason, five_sec_counts, is_officer, is_staff_for, permissions,
     previous_song_keys, warnings_for,
 )
 from .views import _festival_to_dict
@@ -96,6 +96,7 @@ def submission_public(sub: Submission, user, now) -> dict:
         "songLink": sub.song_link,
         "remarks": sub.remarks,
         "restrictedWork": sub.restricted_work,
+        "isBackup": sub.is_backup,
         "fiveSec": sub.five_sec,
         "status": sub.status(now),
         "isMine": user is not None and sub.submitter_id == user.pk,
@@ -277,16 +278,21 @@ def manage_festivals(request):
 def _summary(subs: list[Submission], festival: Festival, now) -> dict:
     active = [s for s in subs if s.is_active]
     durations = [s.duration_seconds for s in active if s.duration_seconds]
+    five_sec_requested, five_sec_uploaded = five_sec_counts(active, now)
     return {
         "active": len(active),
-        "bySource": {key: sum(1 for s in active if s.source == key) for key, _ in Submission.SOURCE_CHOICES},
+        # 合作社團的正選才算進上限，備曲另外算
+        "bySource": {
+            key: sum(1 for s in active if s.source == key and not s.is_backup) for key, _ in Submission.SOURCE_CHOICES
+        },
+        "partnerBackups": sum(1 for s in active if s.is_backup),
         "partnerLimit": festival.partner_limit,
         "uploaded": sum(1 for s in active if s.status(now) == "uploaded"),
         "overdue": sum(1 for s in active if s.status(now) == "overdue"),
         "withdrawn": sum(1 for s in subs if s.withdrawn_at),
         "rejected": sum(1 for s in subs if s.is_rejected),
-        "fiveSecRequested": sum(1 for s in active if s.five_sec),
-        "fiveSecUploaded": sum(1 for s in active if s.five_sec_status(now) == "uploaded"),
+        "fiveSecRequested": five_sec_requested,
+        "fiveSecUploaded": five_sec_uploaded,
         "totalDuration": sum(durations),
         "missingDuration": len(active) - len(durations),
     }

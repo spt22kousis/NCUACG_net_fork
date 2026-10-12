@@ -150,7 +150,7 @@ class SubmissionAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {"fields": ("festival", "source", "submitter", "editor_name", "contact_email")}),
         ("歌曲", {"fields": ("song_source", "visual_source", "title", "artist", "attributes", "song_link",
-                             "remarks", "restricted_work", "five_sec", "chain_with")}),
+                             "remarks", "restricted_work", "five_sec", "is_backup", "chain_with")}),
         ("繳交", {"fields": ("file_link", "duration_seconds", "uploaded_at", "file_updated_at",
                              "five_sec_link", "five_sec_uploaded_at")}),
         ("排歌組處理", {"fields": ("withdrawn_at", "extended_until", "file_checked", "is_rejected",

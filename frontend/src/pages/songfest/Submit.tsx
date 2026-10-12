@@ -107,7 +107,7 @@ function MySubmissionCard({ sub, festival, all, onChanged }: MyCardProps) {
         <StatusBadge status={sub.status} />
       </header>
       <dl className="sf-submission-meta">
-        <div><dt>投稿</dt><dd>{sub.sourceLabel} · {sub.editorName}</dd></div>
+        <div><dt>投稿</dt><dd>{sub.sourceLabel}{sub.isBackup && '（備曲）'} · {sub.editorName}</dd></div>
         <div><dt>長度</dt><dd>{sub.duration ? formatDuration(sub.duration) : '未填'}</dd></div>
         <div><dt>5 秒畫面</dt><dd>{FIVE_SEC_LABEL[sub.fiveSecStatus]}</dd></div>
         {chained && <div><dt>連曲</dt><dd>〈{chained.title}〉</dd></div>}
@@ -149,7 +149,7 @@ function ThreadRow({ sub }: { sub: SubmissionPublic }) {
         <SongLine sub={sub} />
         <div className="sf-thread-meta">
           <span>{sub.editorName}{sub.isMine && '（我）'}</span>
-          <span className="sf-muted">{sub.sourceLabel}</span>
+          <span className="sf-muted">{sub.sourceLabel}{sub.isBackup && '（備曲）'}</span>
           {sub.fiveSec && <span className="sf-muted">5 秒</span>}
           <StatusBadge status={sub.status} />
         </div>

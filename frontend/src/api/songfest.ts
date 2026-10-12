@@ -177,6 +177,7 @@ export interface SubmissionPublic {
   remarks: string;
   restrictedWork: boolean;
   fiveSec: boolean;
+  isBackup: boolean; // 合作社團的備曲
   status: SubmissionStatus;
   isMine: boolean;
   commentCount: number;
@@ -225,7 +226,8 @@ export interface StaffSubmission extends MySubmission {
 
 export interface ManageSummary {
   active: number;
-  bySource: Record<SubmissionSource, number>;
+  bySource: Record<SubmissionSource, number>; // 合作社團只算正選
+  partnerBackups: number;
   partnerLimit: number;
   uploaded: number;
   overdue: number;
@@ -263,6 +265,7 @@ export interface SubmissionInput {
   remarks?: string;
   restrictedWork?: boolean;
   fiveSec?: boolean;
+  isBackup?: boolean;
   chainWith?: number | null;
   fileLink?: string;
   duration?: number | null;

@@ -20,10 +20,14 @@ const ROW_FILTERS: { value: RowFilter; label: string }[] = [
   { value: 'all', label: '全部' },
   { value: 'pending', label: '未繳交' },
   { value: 'warning', label: '有提醒' },
-  { value: 'inactive', label: '窗歌／退件' },
+  { value: 'inactive', label: '窗歌／退件／未入選' },
 ];
 
 const isInactive = (s: StaffSubmission) => s.status === 'withdrawn' || s.status === 'rejected';
+
+/** 亂入曲由排歌組挑選，沒選上的叫「未入選」而不是「退件」 */
+const statusLabel = (s: StaffSubmission) =>
+  s.source === 'guest' && s.status === 'rejected' ? '未入選' : STATUS_LABEL[s.status];
 
 function matches(sub: StaffSubmission, filter: RowFilter): boolean {
   if (filter === 'pending') return sub.status === 'reported' || sub.status === 'overdue';
@@ -74,14 +78,16 @@ function SubmissionRow({ sub, expanded, onToggle, onUpdate }: RowProps) {
   };
 
   const reject = () => {
-    const reason = window.prompt(`退件〈${sub.title}〉的原因（投稿者看得到）`);
+    const reason = window.prompt(
+      sub.source === 'guest' ? `〈${sub.title}〉不入選的原因（排歌組內部紀錄）` : `退件〈${sub.title}〉的原因（投稿者看得到）`,
+    );
     if (reason !== null) void onUpdate(sub.id, { isRejected: true, rejectReason: reason });
   };
 
   return (
     <>
       <tr className={`${isInactive(sub) ? 'is-inactive' : ''}${expanded ? ' is-expanded' : ''}`}>
-        <td data-label="來源">{sub.sourceLabel}</td>
+        <td data-label="來源">{sub.sourceLabel}{sub.isBackup && <span className="sf-tag">備曲</span>}</td>
         <td data-label="製作者">{sub.editorName}</td>
         <td className="sf-manage-song">
           <button type="button" className="sf-link-button" onClick={onToggle} aria-expanded={expanded}>
@@ -102,7 +108,7 @@ function SubmissionRow({ sub, expanded, onToggle, onUpdate }: RowProps) {
           />
         </td>
         <td data-label="狀態">
-          <span className={`sf-status is-${sub.status}`}>{STATUS_LABEL[sub.status]}</span>
+          <span className={`sf-status is-${sub.status}`}>{statusLabel(sub)}</span>
           {sub.isOffense && <span className="sf-tag is-danger">罰則</span>}
         </td>
         <td data-label="5 秒">{FIVE_SEC_LABEL[sub.fiveSecStatus]}</td>
@@ -148,7 +154,7 @@ function SubmissionRow({ sub, expanded, onToggle, onUpdate }: RowProps) {
               )}
               {sub.guestMessage && <div><dt>想說的話</dt><dd>{sub.guestMessage}</dd></div>}
               {sub.source === 'guest' && <div><dt>收進歌單</dt><dd>{sub.libraryConsent ? '同意' : '不同意'}</dd></div>}
-              {sub.rejectReason && <div><dt>退件原因</dt><dd>{sub.rejectReason}</dd></div>}
+              {sub.rejectReason && <div><dt>{sub.source === 'guest' ? '未入選原因' : '退件原因'}</dt><dd>{sub.rejectReason}</dd></div>}
             </dl>
             <div className="sf-manage-actions">
               {!isInactive(sub) && (
@@ -167,8 +173,14 @@ function SubmissionRow({ sub, expanded, onToggle, onUpdate }: RowProps) {
                 </label>
               )}
               {sub.status === 'rejected'
-                ? <button type="button" className="sf-button" onClick={() => void onUpdate(sub.id, { isRejected: false })}>取消退件</button>
-                : sub.status !== 'withdrawn' && <button type="button" className="sf-button is-danger" onClick={reject}>退件</button>}
+                ? <button type="button" className="sf-button" onClick={() => void onUpdate(sub.id, { isRejected: false })}>
+                    {sub.source === 'guest' ? '改為入選' : '取消退件'}
+                  </button>
+                : sub.status !== 'withdrawn' && (
+                  <button type="button" className="sf-button is-danger" onClick={reject}>
+                    {sub.source === 'guest' ? '不入選' : '退件'}
+                  </button>
+                )}
               {(sub.isOffense || sub.penaltyWaived) && (
                 <label className="sf-check">
                   <input
@@ -306,7 +318,7 @@ export default function Manage() {
             <div className="sf-card sf-stat">
               <span>新曲</span>
               <strong>{summary.active}</strong>
-              <small>本社 {summary.bySource.member}・{data.festival.partnerName} {summary.bySource.partner}/{summary.partnerLimit}・亂入 {summary.bySource.guest}</small>
+              <small>本社 {summary.bySource.member}・{data.festival.partnerName} {summary.bySource.partner}/{summary.partnerLimit}{summary.partnerBackups > 0 && `（備曲 ${summary.partnerBackups}）`}・亂入 {summary.bySource.guest}</small>
             </div>
             <div className="sf-card sf-stat">
               <span>已繳交</span>
@@ -316,7 +328,7 @@ export default function Manage() {
             <div className="sf-card sf-stat">
               <span>5 秒畫面</span>
               <strong>{summary.fiveSecUploaded}/{summary.fiveSecRequested}</strong>
-              <small>共 {summary.fiveSecRequested * 5} 秒</small>
+              <small>共 {summary.fiveSecRequested * 5} 秒（亂入每人最多 5 秒）</small>
             </div>
             <div className="sf-card sf-stat">
               <span>新曲總長</span>

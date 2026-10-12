@@ -88,6 +88,18 @@ class ReportTests(SubmissionTestCase):
         # 同曲名但歌曲出處不同，是不同首歌
         self.assertEqual(self.report(self.bob, songSource="別的作品", title="only my railgun").status_code, 201)
 
+    def test_member_keeps_priority_over_partner(self):
+        """社外投稿規則：社內跟社外撞曲時，優先保留社內作品"""
+        self.report(self.bob, source="partner")  # 社外先報
+        self.assertEqual(self.report(self.alice).status_code, 201)  # 社內照樣可以報
+        res = self.report(make_user("carol@example.test"), source="partner")
+        self.assertEqual(res.status_code, 400)  # 社外不能報社內已經報過的歌
+        self.assertIn("優先保留社內", res.data["title"][0])
+
+        rows = {r["source"]: r for r in auth_client(self.staffer).get(
+            f"/api/songfest/festivals/{self.festival.id}/manage/").data["submissions"]}
+        self.assertIn("優先保留社內", rows["partner"]["warnings"][0]["message"])
+
     def test_withdrawn_song_can_be_reported_again(self):
         self.report(self.alice)
         self.set_deadlines(report=-1)
@@ -102,6 +114,16 @@ class ReportTests(SubmissionTestCase):
         res = self.report(self.bob, source="partner", title="第三首")
         self.assertEqual(res.status_code, 400)
         self.assertIn("source", res.data)
+
+    def test_partner_backup_songs_do_not_count_toward_limit(self):
+        for i in range(2):
+            self.report(self.bob, source="partner", title=f"正選{i}")
+        res = self.report(self.bob, source="partner", title="備曲", isBackup=True)
+        self.assertEqual(res.status_code, 201)
+        self.assertTrue(res.data["isBackup"])
+        self.assertEqual(self.report(self.alice, title="社內備曲", isBackup=True).status_code, 400)
+        summary = auth_client(self.staffer).get(f"/api/songfest/festivals/{self.festival.id}/manage/").data["summary"]
+        self.assertEqual((summary["bySource"]["partner"], summary["partnerBackups"]), (2, 1))
 
     def test_report_closed_after_deadline_but_partner_can_have_later_deadline(self):
         self.set_deadlines(report=-1, partner=2)
@@ -352,9 +374,15 @@ class GuestImportTests(SubmissionTestCase):
     HEADER = ["時間戳記", "投稿人", "電子信箱", "歌曲出處", "畫面出處", "歌曲名稱", "作品檔案上傳", "備註",
               "是否加入中央動畫社歌單?", "是否投稿5秒畫面?", "5秒檔案上傳", "想對我們說的話"]
 
+    def setUp(self):
+        super().setUp()
+        # 時間只算一次：同一份表單匯入兩次，時間戳記要一樣才會被當成同一筆回覆
+        now = dt.datetime.now().replace(microsecond=0)
+        self.early = now - 2 * DAY
+        self.late = now + 9 * DAY  # 超過亂入截止
+
     def form_file(self):
-        early = dt.datetime.now() - 2 * DAY
-        late = dt.datetime.now() + 9 * DAY  # 超過亂入截止
+        early, late = self.early, self.late
         data = workbook_bytes({
             "表單回覆 2": [
                 self.HEADER,
@@ -389,6 +417,18 @@ class GuestImportTests(SubmissionTestCase):
         rows = {r["title"]: r for r in auth_client(self.staffer).get(
             f"/api/songfest/festivals/{self.festival.id}/manage/").data["submissions"]}
         self.assertIn("afterGuestDeadline", {w["code"] for w in rows["祈り、終われば"]["warnings"]})
+
+    def test_guest_limit_and_five_sec_per_person(self):
+        for i in range(6):
+            Submission.objects.create(
+                festival=self.festival, source="guest", editor_name="很會剪", contact_email="many@example.test",
+                song_source="x", visual_source="x", title=f"曲{i}", five_sec=True,
+                five_sec_link="https://drive.example/5", five_sec_uploaded_at=timezone.now(),
+            )
+        data = auth_client(self.staffer).get(f"/api/songfest/festivals/{self.festival.id}/manage/").data
+        self.assertIn("guestLimit", {w["code"] for w in data["submissions"][0]["warnings"]})
+        # 亂入曲 5 秒畫面每人最多一段
+        self.assertEqual((data["summary"]["fiveSecRequested"], data["summary"]["fiveSecUploaded"]), (1, 1))
 
     def test_bad_file(self):
         url = f"/api/songfest/festivals/{self.festival.id}/manage/import-guests/"

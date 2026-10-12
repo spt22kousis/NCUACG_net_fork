@@ -243,6 +243,9 @@ class Submission(models.Model):
     remarks = models.TextField("備註", blank=True, help_text="畫面素材、歌曲、剪輯手法；難界定的內容務必註明")
     restricted_work = models.BooleanField("作品有公告禁止二創或限制", default=False)
     five_sec = models.BooleanField("要上傳 5 秒畫面", default=False)
+    is_backup = models.BooleanField(
+        "備曲", default=False, help_text="合作社團的備用曲：正選未滿上限時才補上，不算進上限"
+    )
     chain_with = models.ForeignKey(
         "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
         verbose_name="連曲", help_text="想跟自己的哪一首連續播出",

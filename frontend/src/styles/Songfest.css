@@ -1,0 +1,570 @@
+/* 歌謠祭頁面（首頁、舊曲清單、歌單瀏覽）共用樣式，視覺沿用全站的米色底 + 黑框卡片 */
+.songfest-page {
+  width: 100%;
+  min-height: 100vh;
+  box-sizing: border-box;
+  background-color: #F4F0EB;
+  color: #1f2937;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", sans-serif;
+}
+
+.songfest-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 24px 64px;
+  box-sizing: border-box;
+}
+
+/* ── 標題與分頁籤 ── */
+.songfest-header {
+  /* 右側留空間給右上角的側邊欄按鈕 */
+  padding-right: 64px;
+  margin-bottom: 20px;
+}
+
+.songfest-kicker {
+  margin: 0;
+  color: #6b7280;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+}
+
+.songfest-title {
+  margin: 2px 0 16px;
+  font-size: clamp(1.8rem, 6vw, 2.6rem);
+  line-height: 1.15;
+  color: #000000;
+}
+
+.songfest-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.songfest-tab {
+  padding: 6px 16px;
+  border: 2px solid #000000;
+  border-radius: 999px;
+  background-color: #FFFFFF;
+  color: #1f2937;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.songfest-tab:hover {
+  color: #1f2937;
+  background-color: #EFE7DC;
+}
+
+.songfest-tab.is-active {
+  background-color: #007bff;
+  color: #FFFFFF;
+}
+
+/* ── 共用元件 ── */
+.sf-card {
+  box-sizing: border-box;
+  background-color: #FFFFFF;
+  border: 3px solid #000000;
+  border-radius: 16px;
+  box-shadow: 5px 5px 0 #000000;
+}
+
+.sf-lead {
+  margin: 0 0 20px;
+  max-width: 46rem;
+  color: #374151;
+}
+
+.sf-section {
+  margin-top: 28px;
+}
+
+.sf-section-title {
+  margin: 0 0 12px;
+  font-size: 1.25rem;
+  color: #000000;
+}
+
+.sf-section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sf-section-row .sf-section-title {
+  margin-bottom: 0;
+}
+
+.sf-note {
+  margin: 6px 0 12px;
+  font-size: 14px;
+}
+
+.sf-muted {
+  color: #6b7280;
+}
+
+.sf-error {
+  color: #dc2626;
+}
+
+.sf-empty {
+  padding: 20px;
+  color: #4b5563;
+}
+
+.sf-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border: 2px solid #000000;
+  border-radius: 999px;
+  background-color: #FFD84D;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sf-code {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.sf-rank {
+  flex: none;
+  width: 2em;
+  text-align: right;
+  font-weight: 700;
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-toggle,
+.sf-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sf-toggle button,
+.sf-chips button,
+.sf-pager button {
+  padding: 4px 12px;
+  border: 2px solid #000000;
+  border-radius: 999px;
+  background-color: #FFFFFF;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sf-toggle button.is-active,
+.sf-chips button.is-active {
+  background-color: #007bff;
+  color: #FFFFFF;
+}
+
+.sf-toggle button:focus-visible,
+.sf-chips button:focus-visible,
+.sf-pager button:focus-visible,
+.songfest-tab:focus-visible,
+.sf-link-card:focus-visible,
+.sf-festival-card:focus-visible {
+  outline: 3px solid #007bff;
+  outline-offset: 2px;
+}
+
+/* ── 首頁 ── */
+.sf-upcoming {
+  padding: 20px 24px;
+}
+
+.sf-upcoming + .sf-upcoming {
+  margin-top: 14px;
+}
+
+.sf-upcoming-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sf-upcoming-head h2 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.sf-upcoming-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 14px 0 0;
+}
+
+.sf-upcoming-meta dt {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.sf-upcoming-meta dd {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.sf-upcoming-desc {
+  margin: 14px 0 0;
+  white-space: pre-wrap;
+}
+
+.sf-links {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.sf-link-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px 18px;
+  color: #1f2937;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sf-link-card strong {
+  font-size: 1.1rem;
+}
+
+.sf-link-card span {
+  font-size: 14px;
+  font-weight: 400;
+  color: #4b5563;
+}
+
+a.sf-link-card:hover {
+  color: #1f2937;
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0 #000000;
+}
+
+.sf-link-card.is-disabled {
+  background-color: #EFE7DC;
+  box-shadow: none;
+  border-style: dashed;
+}
+
+.sf-ranking,
+.sf-setlist {
+  margin: 0;
+  padding: 6px 0;
+  list-style: none;
+}
+
+.sf-ranking li,
+.sf-setlist li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+}
+
+.sf-ranking li + li,
+.sf-setlist li + li {
+  border-top: 1px solid #e5e7eb;
+}
+
+.sf-ranking-song,
+.sf-setlist-song {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.sf-ranking-song small,
+.sf-setlist-song small,
+.sf-setlist-meta small {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.sf-ranking-count {
+  flex: none;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 舊曲清單 ── */
+.sf-filters {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sf-search {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border: 2px solid #000000;
+  border-radius: 10px;
+  background-color: #FFFFFF;
+  color: #1f2937;
+  font-size: 16px; /* 小於 16px 時 iOS 會自動放大畫面 */
+}
+
+.sf-search:focus {
+  outline: 3px solid #007bff;
+  outline-offset: 1px;
+}
+
+.sf-filter-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sf-sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.sf-sort select {
+  padding: 4px 8px;
+  border: 2px solid #000000;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.sf-result-count {
+  margin: 16px 0 8px;
+  font-size: 14px;
+}
+
+.sf-table-wrap {
+  overflow-x: auto;
+  transition: opacity 0.15s ease;
+}
+
+.sf-table-wrap.is-loading {
+  opacity: 0.55;
+}
+
+.sf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.sf-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 13px;
+  color: #4b5563;
+  background-color: #EFE7DC;
+  border-bottom: 2px solid #000000;
+  white-space: nowrap;
+}
+
+.sf-table th small {
+  font-weight: 400;
+}
+
+.sf-table td {
+  padding: 10px 12px;
+  vertical-align: top;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sf-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.sf-table .sf-num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-primary {
+  display: block;
+  font-weight: 600;
+  color: #111827;
+}
+
+.sf-secondary {
+  display: block;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.sf-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+  font-size: 14px;
+}
+
+.sf-pager button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ── 歌單瀏覽 ── */
+.sf-festival-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.sf-festival-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  color: #1f2937;
+  font-weight: 400;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sf-festival-card strong {
+  font-size: 1.1rem;
+}
+
+.sf-festival-card:hover {
+  color: #1f2937;
+  transform: translate(-2px, -2px);
+  box-shadow: 7px 7px 0 #000000;
+}
+
+.sf-back {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.sf-back:hover {
+  color: #007bff;
+}
+
+.sf-setlist-head h2 {
+  margin: 0;
+  font-size: 1.6rem;
+  color: #000000;
+}
+
+.sf-setlist-head p {
+  margin: 4px 0 0;
+}
+
+.sf-setlist-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex: none;
+  max-width: 40%;
+  text-align: right;
+}
+
+.sf-setlist li.is-credits {
+  background-color: #FFF8DB;
+}
+
+/* ── 手機 ── */
+@media (max-width: 768px) {
+  .songfest-inner {
+    padding: 16px 16px 48px;
+  }
+
+  .sf-links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .sf-filter-row {
+    flex-direction: column;
+  }
+
+  /* 表格改成一首一張卡片 */
+  .sf-table-wrap {
+    overflow: visible;
+  }
+
+  .sf-table thead {
+    display: none;
+  }
+
+  .sf-table,
+  .sf-table tbody,
+  .sf-table tr,
+  .sf-table td {
+    display: block;
+  }
+
+  .sf-table tr {
+    position: relative;
+    padding: 12px 14px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .sf-table tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  .sf-table td {
+    padding: 0;
+    border: none;
+  }
+
+  .sf-table td.sf-code {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+  }
+
+  .sf-table td:nth-child(2) {
+    padding-right: 72px; /* 讓出右上角的 DVD 編號 */
+  }
+
+  .sf-table td:nth-child(3) {
+    margin-top: 6px;
+  }
+
+  /* 製作者、長度、播放紀錄排成一行（放不下再換行），卡片才不會太長 */
+  .sf-table td[data-label] {
+    display: inline-flex;
+    gap: 4px;
+    margin: 6px 14px 0 0;
+    font-size: 13px;
+    color: #374151;
+    text-align: left;
+  }
+
+  .sf-table td[data-label]::before {
+    content: attr(data-label);
+    color: #9ca3af;
+  }
+
+  .sf-ranking li,
+  .sf-setlist li {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+}

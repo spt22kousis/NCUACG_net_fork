@@ -32,12 +32,12 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     角色：
       - 社員：一般帳號
-      - 幹部：is_staff=True，可以登入 /admin 管理社課、作品、留言與活動（見 OFFICER_APP_LABELS）
+      - 幹部：is_staff=True，可以登入 /admin 管理社課、作品、留言、活動與歌謠祭（見 OFFICER_APP_LABELS）
       - 超管：is_superuser=True，擁有全部權限（包括指定誰是幹部）
     """
 
     # 幹部在 Django admin 可以完整管理的 app；其他 app（帳號等）只有超管能動
-    OFFICER_APP_LABELS = {"club", "event"}
+    OFFICER_APP_LABELS = {"club", "event", "songfest"}
 
     email = models.EmailField("email", unique=True)
     name = models.CharField("名稱", max_length=100)

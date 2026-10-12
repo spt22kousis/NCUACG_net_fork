@@ -21,7 +21,7 @@ class UserChangeForm(BaseUserChangeForm):
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     """
-    只有超管看得到這頁（幹部的權限只涵蓋社課與活動，見 User.has_perm）。
+    只有超管看得到這頁（幹部的權限只涵蓋社課、活動與歌謠祭，見 User.has_perm）。
     要讓某人成為幹部：打開他的帳號，勾選「幹部」即可。
     """
 

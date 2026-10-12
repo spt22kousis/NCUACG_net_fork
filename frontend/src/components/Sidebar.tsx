@@ -4,6 +4,16 @@ import { useNavigate } from 'react-router-dom'; //接後端時把這個刪掉
 import { useAuth } from '../contexts/auth';
 import '../styles/Sidebar.css';
 
+// 側邊欄歌謠祭項目 → 頁面
+const SONGFEST_PATH: Record<string, string> = {
+  '舊曲清單': '/songfest/library',
+  '新曲投稿': '/songfest/submit',
+  '亂入投稿說明/投票': '/songfest/guest',
+  '歌單瀏覽': '/songfest/setlists',
+  '點歌系統': '/songfest/requests',
+  '管理歌單': '/songfest/manage',
+};
+
 // 側邊欄社課名稱 → 成果牆的社課種類代碼
 const COURSE_CATEGORY: Record<string, string> = {
   '動畫播放組': 'anime',
@@ -143,7 +153,7 @@ const menuOptions: Option[] = [
     if (category) {
       navigate(`/club/works?category=${category}`);
     } else if (parent === '歌謠祭平台') {
-      navigate('/songfest');
+      navigate(SONGFEST_PATH[item] ?? '/songfest');
     } else if (item === '行事曆') {
       navigate('/calendar');
     } else if (item === '活動公告一覽') {

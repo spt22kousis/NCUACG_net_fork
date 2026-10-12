@@ -15,7 +15,8 @@
 | 註冊 / 登入 / 信箱驗證 / 重寄驗證信 | ✅ 可用 |
 | 忘記密碼 | 🚧 尚未接上後端 |
 | 行事曆 | 🚧 建置中 |
-| 歌謠祭平台（點歌、投稿、排行榜、排歌後台） | 🚧 建置中 |
+| 歌謠祭：舊曲清單、歷屆歌單、最常播的歌 | ✅ 可用，資料從社團的 Google 試算表匯入 |
+| 歌謠祭：新曲投稿、點歌、排歌後台 | 🚧 建置中 |
 | 生成式 AI 助理 | 🛠️ 維護中（後端 assistant app 未啟用） |
 
 ---
@@ -40,6 +41,7 @@ NCUACG_net/
 │   ├── accounts/             # 帳號：註冊、登入、信箱驗證、JWT
 │   ├── club/                 # 社課與成果牆：社課、作品、按讚、留言
 │   ├── event/                # 活動公告
+│   ├── songfest/             # 歌謠祭：舊曲、歷屆播放紀錄、試算表匯入
 │   ├── assistant/            # AI 助理（目前未掛載）
 │   ├── home/                 # 預留
 │   ├── requirements.txt      # 後端必要套件
@@ -96,17 +98,34 @@ npm run dev
 網站帳號就是後台帳號（`settings.AUTH_USER_MODEL = 'accounts.User'`），沒有第二套帳號：
 
 - **社員**：在網站註冊、點驗證信啟用。
-- **幹部**：超管在 http://localhost:8000/admin/ →「帳號」打開該社員，勾選「幹部」。之後他用同一組 email / 密碼登入 `/admin`，就能管理社課、作品、留言與活動。
+- **幹部**：超管在 http://localhost:8000/admin/ →「帳號」打開該社員，勾選「幹部」。之後他用同一組 email / 密碼登入 `/admin`，就能管理社課、作品、留言、活動與歌謠祭。
 - **超管**：用 `createsuperuser` 建立，擁有全部權限（包括指定幹部）。
 
 > **從 2026/10 以前的版本更新的人**：帳號資料表改版了，舊的本機資料庫不相容。請把 `NCUACG/db.sqlite3` 刪掉（或改名備份），再重新 `python manage.py migrate` 與 `createsuperuser`。
+
+##### 歌謠祭資料（舊曲、播放紀錄）
+
+舊曲與播放紀錄以社團的 Google 試算表為**正本**：「中央動畫社線上歌單」與「最新播放曲目統計」。網站不直接修改這兩種資料，試算表更新後再匯入一次即可（可以重複匯入，結果會跟試算表一樣）。
+
+1. 在 Google 試算表選「檔案 → 下載 → Microsoft Excel (.xlsx)」。
+2. 幹部登入 `/admin` →「歌謠祭」→「舊曲（歌單）」→ 右上角「匯入試算表」，上傳檔案。先按「試跑」看變動，再按「匯入」。
+
+本機也可以用指令匯入：
+
+```
+python manage.py import_songfest --songlist 線上歌單.xlsx --history 最新播放曲目統計.xlsx --dry-run
+```
+
+- 過去的場次會依播放日期自動建立，名稱（例如 114下期末）是從日期推的，可以到後台「歌謠祭場次」改；之後的場次由幹部在後台新增，就會出現在歌謠祭首頁。
+- 播放紀錄沒有 DVD 編號，只能用「歌曲出處 + 畫面出處 + 曲名」去對歌單；對不到的大多是沒收進歌單的新曲，播放次數照樣會算。
+- 試算表含社員與投稿者資料，**不要放進 repo**。
 
 ##### 開發小提醒
 
 - 本機沒有接 SMTP，註冊驗證信會**印在跑 Django 的終端機**上（內容是 base64，解開後就是驗證連結）。
 - 驗證信連結會指向 `FRONTEND_ORIGIN`（沒設就是 `http://localhost:5173`）。
 - Python 套件請加進 `NCUACG/requirements.txt`，不要在 cmd 打 `pip install xxx>=1.0`：沒加引號時 `>` 會被當成輸出重導向，產生名叫 `1.0` 的垃圾檔案。
-- 送出前請跑一次 `npm run lint` 與 `npm run build`（會做 TypeScript 型別檢查），後端跑 `python manage.py test accounts club event`。
+- 送出前請跑一次 `npm run lint` 與 `npm run build`（會做 TypeScript 型別檢查），後端跑 `python manage.py test accounts club event songfest`。
 - GitHub Actions（`.github/workflows/ci.yml`）會在每次 push 到 main 與每個 PR 自動跑上面這些檢查。
 
 ---

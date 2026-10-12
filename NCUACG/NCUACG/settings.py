@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     'club',
     'event',
     'home',
+    'songfest',
 ]
 
 MIDDLEWARE = [

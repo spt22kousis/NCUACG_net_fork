@@ -96,7 +96,8 @@ npm run dev
 - 本機沒有接 SMTP，註冊驗證信會**印在跑 Django 的終端機**上（內容是 base64，解開後就是驗證連結）。
 - 驗證信連結會指向 `FRONTEND_ORIGIN`（沒設就是 `http://localhost:5173`）。
 - Python 套件請加進 `NCUACG/requirements.txt`，不要在 cmd 打 `pip install xxx>=1.0`：沒加引號時 `>` 會被當成輸出重導向，產生名叫 `1.0` 的垃圾檔案。
-- 送出前請跑一次 `npm run lint` 與 `npm run build`（會做 TypeScript 型別檢查）。
+- 送出前請跑一次 `npm run lint` 與 `npm run build`（會做 TypeScript 型別檢查），後端跑 `python manage.py test accounts club event`。
+- GitHub Actions（`.github/workflows/ci.yml`）會在每次 push 到 main 與每個 PR 自動跑上面這些檢查。
 
 ---
 

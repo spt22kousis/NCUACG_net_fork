@@ -35,8 +35,12 @@ export default function Announcement() {
   return (
     <>
       <Sidebar />
-      <main style={{ padding: '16px', maxWidth: 960, margin: '0 auto' }}>
-        <h1 style={{ margin: '8px 0 16px' }}>最新活動（未來 30 天）</h1>
+      {/* App 外層已經有 <main>，這裡用 div 避免巢狀 main */}
+      <div style={{ padding: '16px', maxWidth: 960, margin: '0 auto', boxSizing: 'border-box' }}>
+        {/* 右側留空間給右上角的側邊欄按鈕；字級隨螢幕縮放，手機上才不會壓到按鈕 */}
+        <h1 style={{ margin: '8px 0 16px', paddingRight: 64, fontSize: 'clamp(1.6rem, 6vw, 2.5rem)' }}>
+          最新活動（未來 30 天）
+        </h1>
 
         {loading && <div>載入中…</div>}
         {err && !loading && <div style={{ color: 'crimson' }}>載入失敗：{err}</div>}
@@ -81,7 +85,7 @@ export default function Announcement() {
             })}
           </div>
         )}
-      </main>
+      </div>
     </>
   );
 }

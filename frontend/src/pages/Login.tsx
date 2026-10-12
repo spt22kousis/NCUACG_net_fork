@@ -191,7 +191,10 @@ export default function Login() {
 
   <div>
     <p>其他登入方式</p>
-    <button className='portal_submit_btn'>portal 登入</button>
+    {/* 中央大學 Portal 登入尚未串接 */}
+    <button type="button" className='portal_submit_btn' disabled title="即將推出">
+      portal 登入（即將推出）
+    </button>
   </div>
 </div>
   <Sidebar />

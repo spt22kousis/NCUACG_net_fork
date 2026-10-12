@@ -32,6 +32,8 @@ const Sidebar: React.FC = () => {
   // 超管也是幹部；幹部也能看社員限定的項目
   const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
   const isMember = isAuthenticated;
+  // 排歌組成員不一定是幹部
+  const isSongfestStaff = isAdmin || Boolean(user?.songfestStaff);
   // 根據按鈕文字導航
   const navigate = useNavigate();
   const [activeMenu, setActive] = useState<string | null>(null);
@@ -39,7 +41,7 @@ const Sidebar: React.FC = () => {
 
 interface Requirement {
   name: string;
-  requirement?: 'public'|'member' | 'admin';
+  requirement?: 'public'|'member' | 'admin' | 'songfestStaff';
 }
 interface Option {
   name: string;
@@ -55,7 +57,7 @@ const menuOptions: Option[] = [
       { name: '亂入投稿說明/投票', requirement: 'public' },
       { name: '歌單瀏覽', requirement: 'public' },
       { name: '點歌系統', requirement: 'member' },
-      { name: '管理歌單', requirement: 'admin' }
+      { name: '管理歌單', requirement: 'songfestStaff' }
     ]
   },
   {
@@ -273,6 +275,7 @@ const menuOptions: Option[] = [
                               if (child.requirement === 'member' && isMember) return true;
                               // 如果需要管理員權限且是管理員，就顯示
                               if (child.requirement === 'admin' && isAdmin) return true;
+                              if (child.requirement === 'songfestStaff' && isSongfestStaff) return true;
                               // 其他情況一律不顯示
                               return false;
                             }

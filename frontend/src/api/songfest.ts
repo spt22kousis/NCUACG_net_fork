@@ -122,3 +122,275 @@ export function todayIso(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
+
+// ── 新曲投稿（對應後端 NCUACG/songfest/submission_views.py）──────────────────
+
+export type SubmissionSource = 'member' | 'partner' | 'guest';
+export type SubmissionStatus = 'reported' | 'uploaded' | 'overdue' | 'withdrawn' | 'rejected';
+export type FiveSecStatus = 'none' | 'pending' | 'uploaded' | 'cancelled';
+
+export const STATUS_LABEL: Record<SubmissionStatus, string> = {
+  reported: '已報曲',
+  uploaded: '已繳交',
+  overdue: '逾期未繳交',
+  withdrawn: '窗歌',
+  rejected: '退件',
+};
+
+export const FIVE_SEC_LABEL: Record<FiveSecStatus, string> = {
+  none: '不放',
+  pending: '待繳',
+  uploaded: '已繳',
+  cancelled: '取消',
+};
+
+export interface SongfestFestival extends Festival {
+  reportDeadline: string | null;
+  partnerDeadline: string | null;
+  withdrawDeadline: string | null;
+  uploadDeadline: string | null;
+  guestDeadline: string | null;
+  reportOpen: { member: boolean; partner: boolean };
+  partnerName: string;
+  partnerLimit: number;
+  rules: string;
+  guestFormUrl: string;
+  guestInfo: string;
+}
+
+export interface ActiveFestival {
+  festival: SongfestFestival | null;
+  viewer: { banReason: string | null; isStaff: boolean } | null; // 沒登入時是 null
+}
+
+export interface SubmissionPublic {
+  id: number;
+  source: SubmissionSource;
+  sourceLabel: string;
+  editorName: string;
+  songSource: string;
+  visualSource: string;
+  title: string;
+  artist: string;
+  attributes: string;
+  songLink: string;
+  remarks: string;
+  restrictedWork: boolean;
+  fiveSec: boolean;
+  status: SubmissionStatus;
+  isMine: boolean;
+  commentCount: number;
+  createdAt: string;
+}
+
+export interface SubmissionPermissions {
+  canEditSong: boolean;    // 報曲截止前：可以改歌
+  canDelete: boolean;      // 報曲截止前：可以直接刪除
+  canWithdraw: boolean;    // 報曲截止後：只能窗歌
+  canEditDetails: boolean; // 繳交截止前：可以填檔案、改說明
+  withdrawIsLate: boolean; // 現在窗歌會被記罰則
+}
+
+export interface MySubmission extends SubmissionPublic {
+  fileLink: string;
+  duration: number | null;
+  uploadedAt: string | null;
+  fileUpdatedAt: string | null;
+  fiveSecLink: string;
+  fiveSecStatus: FiveSecStatus;
+  uploadDeadline: string | null;
+  extendedUntil: string | null;
+  chainWith: number | null;
+  withdrawnAt: string | null;
+  rejectReason: string;
+  permissions: SubmissionPermissions;
+}
+
+export interface SubmissionWarning {
+  code: string;
+  message: string;
+}
+
+export interface StaffSubmission extends MySubmission {
+  submitterName: string | null;
+  contactEmail: string;
+  guestMessage: string;
+  libraryConsent: boolean;
+  fileChecked: boolean;
+  penaltyWaived: boolean;
+  isOffense: boolean;
+  changedAfterUpload: boolean;
+  warnings: SubmissionWarning[];
+}
+
+export interface ManageSummary {
+  active: number;
+  bySource: Record<SubmissionSource, number>;
+  partnerLimit: number;
+  uploaded: number;
+  overdue: number;
+  withdrawn: number;
+  rejected: number;
+  fiveSecRequested: number;
+  fiveSecUploaded: number;
+  totalDuration: number;
+  missingDuration: number;
+}
+
+export interface ManageOverview {
+  festival: SongfestFestival;
+  summary: ManageSummary;
+  submissions: StaffSubmission[];
+}
+
+export interface SubmissionComment {
+  id: number;
+  username: string;
+  content: string;
+  createdAt: string;
+  canDelete: boolean;
+}
+
+/** 送出投稿或修改時的欄位；修改時只送有變的 */
+export interface SubmissionInput {
+  source?: 'member' | 'partner';
+  songSource?: string;
+  visualSource?: string;
+  title?: string;
+  artist?: string;
+  attributes?: string;
+  songLink?: string;
+  remarks?: string;
+  restrictedWork?: boolean;
+  fiveSec?: boolean;
+  chainWith?: number | null;
+  fileLink?: string;
+  duration?: number | null;
+  fiveSecLink?: string;
+}
+
+export interface StaffUpdate {
+  fileChecked?: boolean;
+  extendedUntil?: string | null;
+  isRejected?: boolean;
+  rejectReason?: string;
+  penaltyWaived?: boolean;
+  duration?: number | null;
+}
+
+export async function fetchActiveFestival(): Promise<ActiveFestival> {
+  return (await api.get<ActiveFestival>('/songfest/active/')).data;
+}
+
+export async function fetchReportThread(festivalId: number): Promise<SubmissionPublic[]> {
+  return (await api.get<SubmissionPublic[]>(`/songfest/festivals/${festivalId}/submissions/`)).data;
+}
+
+export async function fetchMySubmissions(festivalId: number): Promise<MySubmission[]> {
+  return (await api.get<MySubmission[]>(`/songfest/festivals/${festivalId}/my-submissions/`)).data;
+}
+
+export async function createSubmission(festivalId: number, input: SubmissionInput): Promise<MySubmission> {
+  return (await api.post<MySubmission>(`/songfest/festivals/${festivalId}/submissions/`, input)).data;
+}
+
+export async function updateSubmission(id: number, input: SubmissionInput): Promise<MySubmission> {
+  return (await api.patch<MySubmission>(`/songfest/submissions/${id}/`, input)).data;
+}
+
+export async function deleteSubmission(id: number): Promise<void> {
+  await api.delete(`/songfest/submissions/${id}/`);
+}
+
+export async function withdrawSubmission(id: number): Promise<MySubmission> {
+  return (await api.post<MySubmission>(`/songfest/submissions/${id}/withdraw/`)).data;
+}
+
+export async function fetchSubmissionComments(id: number): Promise<SubmissionComment[]> {
+  return (await api.get<SubmissionComment[]>(`/songfest/submissions/${id}/comments/`)).data;
+}
+
+export async function postSubmissionComment(id: number, content: string): Promise<SubmissionComment> {
+  return (await api.post<SubmissionComment>(`/songfest/submissions/${id}/comments/`, { content })).data;
+}
+
+export async function deleteSubmissionComment(commentId: number): Promise<void> {
+  await api.delete(`/songfest/submission-comments/${commentId}/`);
+}
+
+export interface ManageFestival {
+  id: number;
+  name: string;
+  date: string;
+}
+
+export async function fetchManageFestivals(): Promise<ManageFestival[]> {
+  return (await api.get<ManageFestival[]>('/songfest/manage/festivals/')).data;
+}
+
+export async function fetchManageOverview(festivalId: number): Promise<ManageOverview> {
+  return (await api.get<ManageOverview>(`/songfest/festivals/${festivalId}/manage/`)).data;
+}
+
+export async function staffUpdateSubmission(id: number, input: StaffUpdate): Promise<StaffSubmission> {
+  return (await api.patch<StaffSubmission>(`/songfest/manage/submissions/${id}/`, input)).data;
+}
+
+/** 下載 CSV：要帶登入 token，所以用 axios 拿檔案再交給瀏覽器存檔 */
+export async function downloadSubmissionCsv(festivalId: number, filename: string): Promise<void> {
+  const res = await api.get<Blob>(`/songfest/festivals/${festivalId}/manage/export/`, { responseType: 'blob' });
+  const url = URL.createObjectURL(res.data);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function importGuestForm(festivalId: number, file: File): Promise<{ lines: string[]; warnings: string[] }> {
+  const form = new FormData();
+  form.append('file', file);
+  return (await api.post(`/songfest/festivals/${festivalId}/manage/import-guests/`, form)).data;
+}
+
+/** 2026-10-02T21:00:00+08:00 → 10/02（五）21:00 */
+export function formatDateTime(iso: string | null, withYear = false): string {
+  if (!iso) return '未設定';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const date = `${withYear ? `${d.getFullYear()}/` : ''}${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
+  return `${date}（${WEEKDAYS[d.getDay()]}）${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function isPast(iso: string | null): boolean {
+  return iso !== null && new Date(iso).getTime() < Date.now();
+}
+
+/** 「4:25」「1:02:03」或純秒數 → 秒；看不懂回 null */
+export function parseDuration(text: string): number | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  if (/^\d+$/.test(trimmed)) return Number(trimmed);
+  const parts = trimmed.split(':').map(Number);
+  if (parts.some(n => Number.isNaN(n)) || parts.length < 2 || parts.length > 3) return null;
+  return parts.reduce((total, n) => total * 60 + n, 0);
+}
+
+/** 7213 → 2:00:13 */
+export function formatLongDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+/** 把 DRF 回的錯誤（{欄位: [訊息]} 或 {detail}）攤平成一句話 */
+export function apiErrorMessage(err: unknown, fallback = '送出失敗，請稍後再試'): string {
+  const data = (err as { response?: { data?: unknown } })?.response?.data;
+  if (data && typeof data === 'object') {
+    const messages = Object.values(data as Record<string, unknown>).flatMap(v => (Array.isArray(v) ? v : [v]));
+    const text = messages.filter(m => typeof m === 'string').join(' ');
+    if (text) return text;
+  }
+  return fallback;
+}

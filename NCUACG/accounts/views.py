@@ -34,10 +34,14 @@ class UserProfileView(APIView):
             elif user.is_staff:
                 role = "admin"
 
+            # 排歌組成員不一定是幹部，側邊欄的「管理歌單」要另外判斷
+            from songfest.submissions import is_songfest_staff
+
             response_data = {
                 "id": user.id,
                 "username": user.name,
                 "role": role,
+                "songfestStaff": is_songfest_staff(user),
             }
 
             # 注意：不要在這裡用 print() 輸出 emoji/中文，Windows 終端機 (cp950)

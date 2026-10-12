@@ -7,7 +7,13 @@ from django.template.response import TemplateResponse
 from django.urls import path
 
 from .importers import SpreadsheetError, import_songfest
-from .models import Festival, Play, Track
+from .models import Festival, FestivalStaff, Play, Submission, SubmissionComment, Track
+
+
+class FestivalStaffInline(admin.TabularInline):
+    # 帳號用一般下拉選單：搜尋式選單需要「帳號」的查看權限，幹部沒有
+    model = FestivalStaff
+    extra = 1
 
 
 @admin.register(Festival)
@@ -16,10 +22,16 @@ class FestivalAdmin(admin.ModelAdmin):
     list_filter = ("kind", "is_published")
     search_fields = ("name", "venue")
     date_hierarchy = "date"
+    inlines = [FestivalStaffInline]
     fieldsets = (
         (None, {"fields": ("name", "date", "kind", "is_published")}),
         ("時間地點", {"fields": ("venue", "start_time", "end_time")}),
         ("公告", {"fields": ("description",)}),
+        ("新曲投稿（沒填報曲截止就不開放投稿）", {
+            "fields": ("report_deadline", "partner_deadline", "withdraw_deadline", "upload_deadline",
+                       "partner_name", "partner_limit", "rules"),
+        }),
+        ("亂入曲", {"fields": ("guest_deadline", "guest_form_url", "guest_info")}),
     )
 
     def get_queryset(self, request):
@@ -114,3 +126,39 @@ class PlayAdmin(SpreadsheetManagedAdmin):
     list_filter = ("match_status", "festival")
     search_fields = ("song_source", "visual_source", "title")
     list_select_related = ("festival", "track")
+
+
+class SubmissionCommentInline(admin.TabularInline):
+    model = SubmissionComment
+    extra = 0
+    fields = ("user", "content", "created_at")
+    readonly_fields = ("user", "content", "created_at")
+
+
+@admin.register(Submission)
+class SubmissionAdmin(admin.ModelAdmin):
+    """
+    排歌組平常用網站上的「管理歌單」頁；換歌、補報（報曲截止後經排歌組同意新增）這類例外處理在這裡改。
+    """
+
+    list_display = ("title", "editor_name", "festival", "source", "status_label", "five_sec", "created_at")
+    list_filter = ("festival", "source", "is_rejected")
+    search_fields = ("title", "song_source", "visual_source", "editor_name", "submitter__name")
+    raw_id_fields = ("chain_with",)
+    readonly_fields = ("created_at", "updated_at", "uploaded_at", "file_updated_at", "five_sec_uploaded_at")
+    inlines = [SubmissionCommentInline]
+    fieldsets = (
+        (None, {"fields": ("festival", "source", "submitter", "editor_name", "contact_email")}),
+        ("歌曲", {"fields": ("song_source", "visual_source", "title", "artist", "attributes", "song_link",
+                             "remarks", "restricted_work", "five_sec", "chain_with")}),
+        ("繳交", {"fields": ("file_link", "duration_seconds", "uploaded_at", "file_updated_at",
+                             "five_sec_link", "five_sec_uploaded_at")}),
+        ("排歌組處理", {"fields": ("withdrawn_at", "extended_until", "file_checked", "is_rejected",
+                                 "reject_reason", "penalty_waived")}),
+        ("亂入曲表單", {"classes": ("collapse",), "fields": ("library_consent", "guest_message")}),
+        ("時間", {"fields": ("created_at", "updated_at")}),
+    )
+
+    @admin.display(description="狀態")
+    def status_label(self, obj):
+        return Submission.STATUS_LABELS[obj.status()]

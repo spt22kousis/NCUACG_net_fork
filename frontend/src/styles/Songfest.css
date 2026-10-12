@@ -487,6 +487,625 @@ a.sf-link-card:hover {
   background-color: #FFF8DB;
 }
 
+/* ── 新曲投稿 ── */
+.sf-festival-panel {
+  padding: 18px 22px;
+}
+
+.sf-festival-panel h2 {
+  margin: 0 0 12px;
+  font-size: 1.25rem;
+  color: #000000;
+}
+
+.sf-deadlines {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sf-deadlines li {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+  border: 2px solid #000000;
+  border-radius: 10px;
+  background-color: #EFE7DC;
+}
+
+.sf-deadlines li span {
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.sf-deadlines li em {
+  font-style: normal;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.sf-deadlines li.is-past {
+  background-color: #F4F0EB;
+  border-style: dashed;
+  color: #6b7280;
+}
+
+.sf-rules {
+  margin-top: 14px;
+}
+
+.sf-rules summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.sf-rules p,
+.sf-guest-info {
+  white-space: pre-wrap;
+  margin: 10px 0 0;
+}
+
+.sf-guest-link {
+  display: inline-block;
+  margin-top: 16px;
+}
+
+.sf-tabs-inline {
+  margin: 24px 0 12px;
+}
+
+.sf-section-tight {
+  margin-top: 8px;
+}
+
+.sf-new-button {
+  margin-bottom: 14px;
+}
+
+.sf-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 16px;
+  border: 2px solid #000000;
+  border-radius: 999px;
+  background-color: #FFFFFF;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sf-button:hover {
+  background-color: #EFE7DC;
+  color: #1f2937;
+}
+
+.sf-button.is-primary {
+  background-color: #007bff;
+  color: #FFFFFF;
+}
+
+.sf-button.is-primary:hover {
+  background-color: #0062cc;
+  color: #FFFFFF;
+}
+
+.sf-button.is-danger {
+  background-color: #FEE2E2;
+  color: #991b1b;
+}
+
+.sf-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sf-button:focus-visible,
+.sf-link-button:focus-visible {
+  outline: 3px solid #007bff;
+  outline-offset: 2px;
+}
+
+.sf-link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: #0062cc;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.sf-link-button:hover {
+  text-decoration: underline;
+}
+
+.sf-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 18px 20px;
+}
+
+.sf-form h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.sf-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.sf-fieldset legend,
+.sf-radio-row legend {
+  padding: 0 6px;
+  font-weight: 700;
+}
+
+.sf-fieldset:disabled {
+  background-color: #f9fafb;
+}
+
+.sf-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.sf-form input:not([type="checkbox"]):not([type="radio"]),
+.sf-form textarea,
+.sf-form select,
+.sf-manage-actions input[type="datetime-local"],
+.sf-comment-form input,
+.sf-reminder {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  color: #1f2937;
+  font: inherit;
+  font-size: 16px; /* 小於 16px 時 iOS 會自動放大畫面 */
+  font-weight: 400;
+}
+
+.sf-form input:focus,
+.sf-form textarea:focus,
+.sf-form select:focus,
+.sf-comment-form input:focus,
+.sf-duration-input:focus {
+  outline: none;
+  border-color: #007bff;
+}
+
+.sf-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+}
+
+.sf-form .sf-check,
+.sf-check {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  font-weight: 400;
+}
+
+/* 其他頁面的全域 input 樣式會把勾選框撐滿整行，這裡固定回原本大小 */
+.sf-check input,
+.sf-radio-row input {
+  flex: none;
+  width: auto;
+  margin-top: 4px;
+}
+
+.sf-radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.sf-radio-row label {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+}
+
+.sf-hint {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: #6b7280;
+}
+
+/* 兩欄並排時，說明文字長短不一，讓輸入框對齊底部 */
+.sf-form-grid label {
+  justify-content: flex-end;
+}
+
+.sf-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.sf-submission-list {
+  display: grid;
+  gap: 14px;
+}
+
+.sf-submission {
+  padding: 16px 18px;
+}
+
+.sf-submission.is-inactive {
+  background-color: #F4F0EB;
+  box-shadow: none;
+  opacity: 0.85;
+}
+
+.sf-submission-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sf-song-line {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sf-song-line strong {
+  font-size: 1.05rem;
+  color: #111827;
+}
+
+.sf-song-line span {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.sf-submission-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 24px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.sf-submission-meta dt {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.sf-submission-meta dd {
+  margin: 0;
+}
+
+.sf-status {
+  flex: none;
+  display: inline-block;
+  padding: 2px 10px;
+  border: 2px solid #000000;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  background-color: #FFFFFF;
+}
+
+.sf-status.is-uploaded {
+  background-color: #DCFCE7;
+}
+
+.sf-status.is-reported {
+  background-color: #FFF8DB;
+}
+
+.sf-status.is-overdue,
+.sf-status.is-rejected {
+  background-color: #FEE2E2;
+  color: #991b1b;
+}
+
+.sf-status.is-withdrawn {
+  background-color: #E5E7EB;
+  color: #4b5563;
+}
+
+.sf-thread {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sf-thread-row {
+  padding: 12px 18px;
+}
+
+.sf-thread-row + .sf-thread-row {
+  border-top: 1px solid #e5e7eb;
+}
+
+.sf-thread-row.is-inactive .sf-song-line strong {
+  text-decoration: line-through;
+  color: #6b7280;
+}
+
+.sf-thread-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sf-thread-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  font-size: 13px;
+}
+
+.sf-thread-note {
+  margin: 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.sf-comments {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background-color: #F4F0EB;
+}
+
+.sf-comment {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 6px 0;
+  font-size: 14px;
+}
+
+.sf-comment + .sf-comment {
+  border-top: 1px dashed #d1d5db;
+}
+
+.sf-comment-text {
+  flex: 1 1 200px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.sf-comment small {
+  font-size: 12px;
+}
+
+.sf-comment-form {
+  display: flex;
+  flex-direction: row; /* 其他頁面的全域 form 樣式是直排 */
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.sf-comment-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.sf-comment-form button {
+  flex: none;
+  width: auto;
+}
+
+/* ── 排歌組總覽 ── */
+.sf-manage-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.sf-notice {
+  padding: 10px 14px;
+  border: 2px solid #000000;
+  border-radius: 10px;
+  background-color: #DCFCE7;
+}
+
+.sf-stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.sf-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  box-shadow: 3px 3px 0 #000000;
+}
+
+.sf-stat span {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.sf-stat strong {
+  font-size: 1.5rem;
+  font-variant-numeric: tabular-nums;
+  color: #000000;
+}
+
+.sf-stat small {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.sf-manage-tools {
+  margin-bottom: 8px;
+}
+
+.sf-manage-tools .sf-form-actions {
+  justify-content: flex-start;
+}
+
+.sf-reminder {
+  font-size: 14px;
+  resize: vertical;
+}
+
+.sf-manage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.sf-manage-table th {
+  padding: 10px 10px;
+  text-align: left;
+  font-size: 13px;
+  color: #4b5563;
+  background-color: #EFE7DC;
+  border-bottom: 2px solid #000000;
+  white-space: nowrap;
+}
+
+.sf-manage-table td {
+  padding: 8px 10px;
+  vertical-align: top;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sf-manage-table tr.is-inactive td {
+  color: #9ca3af;
+}
+
+.sf-manage-table tr.is-expanded td {
+  border-bottom: none;
+  background-color: #FFFDF4;
+}
+
+/* 來源、狀態、5 秒這些短欄位不要被擠成直排 */
+.sf-manage-table td[data-label] {
+  white-space: nowrap;
+}
+
+.sf-manage-song {
+  min-width: 180px;
+}
+
+.sf-duration-input {
+  width: 4.5em;
+  padding: 3px 6px;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.sf-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sf-tag.is-danger {
+  background-color: #FEE2E2;
+  color: #991b1b;
+}
+
+.sf-manage-warnings {
+  min-width: 160px;
+}
+
+.sf-warning {
+  display: block;
+  margin-bottom: 4px;
+  padding: 2px 8px;
+  border-left: 3px solid #F59E0B;
+  background-color: #FFF8DB;
+  font-size: 12px;
+  color: #78350F;
+}
+
+.sf-manage-detail td {
+  padding: 4px 16px 16px;
+  background-color: #FFFDF4;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.sf-manage-detail dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px 20px;
+  margin: 0 0 12px;
+}
+
+.sf-manage-detail dt {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.sf-manage-detail dd {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.sf-manage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+
+.sf-manage-actions label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.sf-manage-actions input[type="datetime-local"] {
+  width: auto;
+  font-size: 14px;
+  padding: 4px 8px;
+}
+
 /* ── 手機 ── */
 @media (max-width: 768px) {
   .songfest-inner {
@@ -566,5 +1185,62 @@ a.sf-link-card:hover {
   .sf-setlist li {
     padding: 10px 12px;
     gap: 10px;
+  }
+
+  .sf-festival-panel,
+  .sf-form,
+  .sf-submission {
+    padding: 14px;
+  }
+
+  .sf-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sf-thread-row {
+    padding: 12px 14px;
+  }
+
+  .sf-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* 排歌組總覽：一首一張卡片 */
+  .sf-manage-table thead {
+    display: none;
+  }
+
+  .sf-manage-table,
+  .sf-manage-table tbody,
+  .sf-manage-table tr,
+  .sf-manage-table td {
+    display: block;
+  }
+
+  .sf-manage-table tr {
+    padding: 10px 14px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .sf-manage-table td {
+    padding: 2px 0;
+    border: none;
+  }
+
+  .sf-manage-table td[data-label] {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-right: 12px;
+    font-size: 13px;
+  }
+
+  .sf-manage-table td[data-label]::before {
+    content: attr(data-label);
+    color: #9ca3af;
+  }
+
+  .sf-manage-table tr.sf-manage-detail td {
+    padding: 8px 0 0;
   }
 }

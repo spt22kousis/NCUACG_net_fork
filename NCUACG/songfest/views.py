@@ -1,6 +1,6 @@
 # NCUACG/songfest/views.py
 """
-歌謠祭 API（掛在 /api/songfest/ 之下，全部公開唯讀）
+歌謠祭公開 API（掛在 /api/songfest/ 之下，全部唯讀；新曲投稿在 submission_views.py）
 
   GET festivals/                         所有公開場次（新到舊），含播放紀錄筆數
   GET festivals/<id>/                    單一場次與播放紀錄

@@ -1,50 +1,42 @@
-from django.shortcuts import render
-from django.contrib.auth import authenticate, login, logout
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework import generics
-import bcrypt
-from accounts.models import User, Credential, VerificationToken
+# NCUACG/accounts/views.py
+import logging
+import traceback
+from datetime import timedelta
+
+from captcha.helpers import captcha_image_url
+from captcha.models import CaptchaStore
 from django.db import transaction
 from django.utils import timezone
-from datetime import timedelta
-from rest_framework.views import APIView
+from rest_framework import generics, status
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status
-from captcha.models import CaptchaStore
-from captcha.helpers import captcha_image_url
-from django.contrib.auth import authenticate
-from django.contrib.auth import get_user_model
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.throttling import AnonRateThrottle
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import ensure_csrf_cookie
-from .verifyemail import generate_verification_token, send_verification_email
-import os
-import logging
-from accounts.serializers import RegisterSerializer, LoginSerializer, CustomTokenRefreshSerializer
+from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenRefreshView
-import traceback
+
+from accounts.models import User, VerificationToken
+from accounts.serializers import CustomTokenRefreshSerializer, LoginSerializer, RegisterSerializer
+from .verifyemail import generate_verification_token, send_verification_email
+
 logger = logging.getLogger(__name__)
+
 
 class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:
-            user = request.user  # 全站預設的 CustomJWTAuthentication 回傳的 accounts.User
+            user = request.user
 
             role = "member"
-            if getattr(user, "is_super_admin", False):
+            if user.is_superuser:
                 role = "superadmin"
-            elif getattr(user, "is_admin", False):
+            elif user.is_staff:
                 role = "admin"
 
             response_data = {
                 "id": user.id,
-                "username": getattr(user, "name", ""),  # 你的 User 是用 name
+                "username": user.name,
                 "role": role,
             }
 
@@ -193,5 +185,5 @@ class ResendVerificationView(APIView):
 
 
 class CustomTokenRefreshView(TokenRefreshView):
-    """/api/token/refresh/ ：改用會查 accounts.User 的序列化器。"""
+    """/api/token/refresh/ ：帳號被刪掉時回 401 而不是 500（見 CustomTokenRefreshSerializer）。"""
     serializer_class = CustomTokenRefreshSerializer

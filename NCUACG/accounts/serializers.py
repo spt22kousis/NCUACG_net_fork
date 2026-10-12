@@ -1,29 +1,15 @@
-﻿from rest_framework import serializers
-
-from django.contrib.auth.password_validation import validate_password
-from django.shortcuts import render
-from django.contrib.auth import authenticate, login, logout
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework import generics
-import bcrypt
-from accounts.models import User, Credential, VerificationToken
+# NCUACG/accounts/serializers.py
+from captcha.models import CaptchaStore
 from django.db import transaction
 from django.utils import timezone
-from captcha.models import CaptchaStore
-from django.contrib.auth import authenticate
-from django.contrib.auth import get_user_model
-from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.serializers import TokenRefreshSerializer
-from rest_framework_simplejwt.settings import api_settings
+from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.permissions import IsAuthenticated
-from django.utils.decorators import method_decorator
-from django.views.decorators.csrf import ensure_csrf_cookie
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
+
+from accounts.models import User, VerificationToken
 from .verifyemail import generate_verification_token, send_verification_email
-import os
-import logging
+
 
 class LoginSerializer(serializers.Serializer):
     useremail = serializers.EmailField()
@@ -56,12 +42,13 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError({"captcha": "驗證碼錯誤"})
 
         # 驗證帳密
-        user = User.objects.filter(email=useremail).first()
-        if not user:
+        user = User.objects.filter(email__iexact=useremail).first()
+        if user is None:
+            # 帳號不存在時也跑一次雜湊，讓回應時間跟「密碼錯誤」差不多，避免被用來探測哪些信箱註冊過
+            User().set_password(password)
             raise serializers.ValidationError({"useremail": "帳號或密碼錯誤"})
 
-        cred = getattr(user, 'credential', None)
-        if not cred or not bcrypt.checkpw(password.encode('utf-8'), cred.password_hash.encode('utf-8')):
+        if not user.check_password(password):
             raise serializers.ValidationError({"useremail": "帳號或密碼錯誤"})
 
         if not user.is_active:
@@ -71,21 +58,17 @@ class LoginSerializer(serializers.Serializer):
                 "unverified": "true",
             })
 
-        # 更新 last_login
-        with transaction.atomic():
-            user.last_login = timezone.now()
-            user.save(update_fields=["last_login"])
+        user.last_login = timezone.now()
+        user.save(update_fields=["last_login"])
 
-        # 簽發 JWT
-        # for_user 會依 SIMPLE_JWT 的 USER_ID_CLAIM（'id'）放入使用者 id，
-        # 驗證端（accounts/authentication.py）也讀同一個設定，不要再手動塞其他 claim
+        # 簽發 JWT（for_user 會依 SIMPLE_JWT 的 USER_ID_CLAIM 放入使用者 id）
         refresh = RefreshToken.for_user(user)
-        attrs['user'] = user
-        attrs['access'] = str(refresh.access_token)
-        attrs['refresh'] = str(refresh)
+        attrs["user"] = user
+        attrs["access"] = str(refresh.access_token)
+        attrs["refresh"] = str(refresh)
         return attrs
 
-    
+
 class RegisterSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=100)
     useremail = serializers.EmailField(write_only=True)
@@ -97,79 +80,36 @@ class RegisterSerializer(serializers.Serializer):
         return value
 
     def validate_useremail(self, value):
-        if User.objects.filter(email=value).exists():
+        if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("此 Email 已註冊過")
         return value
 
     def create(self, validated_data):
-        name = validated_data['name']
-        email = validated_data['useremail']
-        password = validated_data['password']
-
-        hashed = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-
         with transaction.atomic():
-            # 建立未啟用帳號
-            user = User.objects.create(
-                name=name,
-                email=email,
-                is_active=False
+            # 建立未啟用帳號，點了驗證信才會啟用
+            user = User.objects.create_user(
+                email=validated_data["useremail"],
+                name=validated_data["name"],
+                password=validated_data["password"],
+                is_active=False,
             )
-            # 建立 Credential
-            Credential.objects.create(
-                user=user,
-                password_hash=hashed.decode('utf-8')
-            )
-            # 建立驗證 token
             token = generate_verification_token()
             VerificationToken.objects.create(user=user, token=token)
-            # 發送驗證信
-            send_verification_email(email, token)
+            send_verification_email(user.email, token)
 
         return user
 
 
 class CustomTokenRefreshSerializer(TokenRefreshSerializer):
     """
-    用 refresh token 換新的 access token。
-
-    為什麼要自己寫：SimpleJWT 內建的版本會執行
-        get_user_model().objects.get(**{USER_ID_FIELD: user_id})
-    去撈使用者，而 get_user_model() 指向 django.contrib.auth 的 User。
-    本專案的使用者是自訂的 accounts.User（沒有設成 AUTH_USER_MODEL），
-    那張表永遠查不到，結果是每次續命都 DoesNotExist → 500。
-    這裡把那段查詢換成查 accounts.User，其餘輪替邏輯與上游一致。
-
-    註：輪替區塊是照著 simplejwt 5.5.1 的實作寫的，升級套件時要回來對一下。
+    SimpleJWT 內建的續命會用 objects.get() 查使用者，帳號被刪掉時會丟 DoesNotExist 變成 500；
+    這裡改成回 401，前端攔截器就會把使用者登出。帳號停用的情況內建版本已經會擋。
     """
 
     def validate(self, attrs):
-        refresh = self.token_class(attrs["refresh"])
-
-        user_id = refresh.payload.get(api_settings.USER_ID_CLAIM, None)
-        if user_id is not None:
-            user = User.objects.filter(pk=user_id).first()
-            # 帳號被刪掉或被停用時，手上的 refresh token 就該失效
-            if user is None or not user.is_active:
-                raise AuthenticationFailed(
-                    self.error_messages["no_active_account"], "no_active_account"
-                )
-
-        data = {"access": str(refresh.access_token)}
-
-        if api_settings.ROTATE_REFRESH_TOKENS:
-            if api_settings.BLACKLIST_AFTER_ROTATION:
-                try:
-                    refresh.blacklist()
-                except AttributeError:
-                    # 沒裝 blacklist app 時沒有這個方法，忽略即可
-                    pass
-
-            refresh.set_jti()
-            refresh.set_exp()
-            refresh.set_iat()
-            refresh.outstand()
-
-            data["refresh"] = str(refresh)
-
-        return data
+        try:
+            return super().validate(attrs)
+        except User.DoesNotExist:
+            raise AuthenticationFailed(
+                self.error_messages["no_active_account"], "no_active_account"
+            )

@@ -7,7 +7,6 @@ djangorestframework-simplejwt>=5.5,<5.6
 django-cors-headers>=4.7
 django-simple-captcha>=0.6.2
 python-dotenv>=1.0
-bcrypt>=4.0
 # 驗證碼圖片與成果牆縮圖（ImageField）需要
 Pillow>=10.0
 # 只有改用 PostgreSQL 時才需要

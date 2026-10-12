@@ -7,6 +7,7 @@ import ForgetPwd from './pages/ForgetPwd';
 import Announcement from './pages/Announcement';
 import Club from './pages/Club';
 import Works from './pages/Works';
+import { ComingSoon, NotFound } from './pages/StatusPage';
 // 共用 Context
 import { AuthProvider } from './contexts/AuthContext';
 import { ChatProvider } from './contexts/ChatContext';
@@ -35,10 +36,13 @@ export default function App() {
               <Route path="/forget-password" element={<ForgetPwd />} />
               <Route path="/announcement" element={<Announcement />} />
               <Route path="/club" element={< Club/>} />
-              <Route path="/club/works" element={<Works/>}/> {/*這裡先用模擬資料 之後要根據點選的社課種類更換 */}
+              <Route path="/club/works" element={<Works/>}/>
               {/* --- AI 助理聊天頁 --- */}
               <Route path="/assistant" element={<AssistantChat />} />
-              
+              {/* 已放進導覽列、尚未完成的功能 */}
+              <Route path="/songfest" element={<ComingSoon feature="歌謠祭平台" />} />
+              <Route path="/calendar" element={<ComingSoon feature="行事曆" />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
         </main>

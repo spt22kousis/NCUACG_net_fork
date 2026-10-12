@@ -26,6 +26,7 @@ const initialHexItems: HexItem[] = [
   { id: 22, type: 'text', label: '介' },
   { id: 34, type: 'button', label: 'MV\n剪輯', url: 'mv' },
   { id: 35, type: 'button', label: '聲優', url: 'seiyuu' },
+  { id: 36, type: 'button', label: '鐵道', url: 'railway' },
   { id: 32, type: 'text', label: '紹' },
 ];
 

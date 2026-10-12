@@ -17,6 +17,7 @@ class Course(models.Model):
         ("trpg", "TRPG"),
         ("mv", "MV剪輯"),
         ("seiyuu", "聲優"),
+        ("railway", "鐵道"),
     ]
     COLOR_CHOICES = [
         ("blue", "藍"),

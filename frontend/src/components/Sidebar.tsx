@@ -3,11 +3,25 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom'; //接後端時把這個刪掉
 import { useAuth } from '../contexts/auth';
 import '../styles/Sidebar.css';
+
+// 側邊欄社課名稱 → 成果牆的社課種類代碼
+const COURSE_CATEGORY: Record<string, string> = {
+  '動畫播放組': 'anime',
+  'MV剪輯組': 'mv',
+  '繪畫組': 'art',
+  'TRPG組': 'trpg',
+  '聲優組': 'seiyuu',
+  '御宅藝組': 'otaku',
+  '模型製作組': 'model',
+  '鐵道組': 'railway',
+};
+
 const Sidebar: React.FC = () => {
   const { isAuthenticated, user,logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false); // ← 由自己管理開關狀態
-  const isAdmin = user?.role === 'admin';
-  const isMember = user?.role === 'member';
+  // 超管也是幹部；幹部也能看社員限定的項目
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const isMember = isAuthenticated;
   // 根據按鈕文字導航
   const navigate = useNavigate();
   const [activeMenu, setActive] = useState<string | null>(null);
@@ -43,7 +57,8 @@ const menuOptions: Option[] = [
       { name: 'TRPG組', requirement: 'public' },
       { name: '聲優組', requirement: 'public' },
       { name: '御宅藝組', requirement: 'public' },
-      { name: '模型製作組', requirement: 'public' }
+      { name: '模型製作組', requirement: 'public' },
+      { name: '鐵道組', requirement: 'public' }
     ]
   },
   {
@@ -96,7 +111,7 @@ const menuOptions: Option[] = [
         break;
         */
       case '歌謠祭平台':
-        window.location.href = '/about';
+        navigate('/songfest');
         break;
       case '社課介紹':
         navigate('/club');
@@ -106,7 +121,7 @@ const menuOptions: Option[] = [
         break;
         
       case '登入':
-        navigate('/Login');
+        navigate('/login');
         break;
       case '註冊':
         navigate('/register');
@@ -117,18 +132,17 @@ const menuOptions: Option[] = [
     }
     setIsOpen(false); // ← 點完選單自動關閉 Sidebar
   };
-  const handleChildClick = (item: string) => {
-  
-    switch (item) {
-      case '聲優組':
-        // 帶上社課種類，其他社課之後有作品時才不會混在一起
-        navigate('/club/works?category=seiyuu');
-        break;
-      case '活動公告一覽':
-        navigate('/announcement');
-        break;
-      default:
-        break;
+  const handleChildClick = (item: string, parent: string) => {
+    // 社課 → 該種類的成果牆（種類代碼對應後端 club.Course.CATEGORY_CHOICES）
+    const category = COURSE_CATEGORY[item];
+    if (category) {
+      navigate(`/club/works?category=${category}`);
+    } else if (parent === '歌謠祭平台') {
+      navigate('/songfest');
+    } else if (item === '行事曆') {
+      navigate('/calendar');
+    } else if (item === '活動公告一覽') {
+      navigate('/announcement');
     }
     setIsOpen(false); // ← 點完選單自動關閉 Sidebar
   };
@@ -252,7 +266,7 @@ const menuOptions: Option[] = [
                                 whileHover={{ scale: 1.05 }}
                                 whileTap={{ scale: 0.95 }}
                                 className="sub-option-button"
-                                onClick={()=>handleChildClick(child.name)}
+                                onClick={() => handleChildClick(child.name, activeMenu)}
                               >
                                 {child.name}
                               </motion.button>

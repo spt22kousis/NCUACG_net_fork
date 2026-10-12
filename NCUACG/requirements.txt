@@ -1,0 +1,14 @@
+# 後端必要套件：pip install -r requirements.txt
+# AI 助理另外需要專案根目錄的 requirements-assistant.txt（目前未啟用）
+Django>=6.0
+djangorestframework>=3.16
+# accounts/serializers.py 的 CustomTokenRefreshSerializer 照 5.5.x 的實作改寫，升級前要回去對一下
+djangorestframework-simplejwt>=5.5,<5.6
+django-cors-headers>=4.7
+django-simple-captcha>=0.6.2
+python-dotenv>=1.0
+bcrypt>=4.0
+# 驗證碼圖片與成果牆縮圖（ImageField）需要
+Pillow>=10.0
+# 只有改用 PostgreSQL 時才需要
+psycopg2-binary>=2.9

@@ -76,3 +76,6 @@ frontend/build/
 
 # 社團評鑑等內部文件，含社員資料，不進 git
 社團活動績效/
+
+# Notion 匯出（含成員名單），不進 git
+Private & Shared/

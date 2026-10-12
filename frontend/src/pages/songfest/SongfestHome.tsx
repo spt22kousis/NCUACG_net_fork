@@ -88,10 +88,10 @@ export default function SongfestHome() {
             <strong>歌單瀏覽</strong>
             <span>{past.length ? `${firstYear} 年起共 ${past.length} 場的播放紀錄` : '歷屆播過哪些歌'}</span>
           </Link>
-          <div className="sf-card sf-link-card is-disabled" aria-disabled="true">
+          <Link to="/songfest/submit" className="sf-card sf-link-card">
             <strong>新曲投稿</strong>
-            <span>即將推出</span>
-          </div>
+            <span>報曲、繳交、回報串</span>
+          </Link>
           <div className="sf-card sf-link-card is-disabled" aria-disabled="true">
             <strong>點歌系統</strong>
             <span>即將推出</span>

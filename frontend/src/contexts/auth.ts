@@ -9,6 +9,7 @@ export interface User {
   id: number;
   username: string;
   role: 'superadmin' | 'admin' | 'member' | 'guest';
+  songfestStaff?: boolean; // 幹部或之後某場歌謠祭的排歌組成員
 }
 
 export interface AuthContextType {

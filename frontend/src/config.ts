@@ -10,3 +10,8 @@ export const API_BASE: string = import.meta.env.VITE_API_BASE || '/api';
 // 後端準備好後，在 .env 設 VITE_ASSISTANT_ENABLED=true 即可開啟。
 export const ASSISTANT_ENABLED: boolean =
   String(import.meta.env.VITE_ASSISTANT_ENABLED ?? '').toLowerCase() === 'true';
+
+// Django 後台。開發時前端在 5173、後台在 Django 的 8000（vite 只轉發 /api 與 /media）；
+// 正式站前後端同網域時就是 /admin/。不同網域請在 .env 設 VITE_ADMIN_URL。
+export const ADMIN_URL: string =
+  import.meta.env.VITE_ADMIN_URL || (import.meta.env.DEV ? 'http://localhost:8000/admin/' : '/admin/');

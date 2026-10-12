@@ -338,3 +338,95 @@ def import_songfest(songlist=None, history=None, *, prune: bool = False, dry_run
             transaction.set_rollback(True)
             report.add("（試跑：以上變更都沒有寫入）")
     return report
+
+
+# ── 亂入曲：Google 表單回覆 ─────────────────────────────────────────────────
+
+GUEST_REQUIRED = {"時間戳記", "投稿人", "歌曲名稱"}
+
+
+def _get_prefixed(row, columns: dict[str, int], prefix: str):
+    """表單題目常常帶問號或說明文字（例如「是否加入中央動畫社歌單?」），用開頭比對欄位。"""
+    for name, j in columns.items():
+        if name.startswith(prefix):
+            return row[j] if j < len(row) else None
+    return None
+
+
+def import_guest_form(festival, source) -> ImportReport:
+    """
+    匯入亂入曲 Google 表單的回覆（下載成 .xlsx）。以「時間戳記 + 信箱」識別同一筆回覆，
+    可以重複匯入：表單欄位以表單為準更新，排歌組填的長度、退件等不會被蓋掉。
+    """
+    from django.utils import timezone
+
+    from .models import Submission
+
+    report = ImportReport()
+    workbook = load_workbook(source)
+    entries: dict[str, dict] = {}
+    found_sheet = False
+    try:
+        for sheet in workbook.worksheets:
+            rows = _rows(sheet)
+            header = _find_header(rows, GUEST_REQUIRED)
+            if header is None:
+                continue
+            found_sheet = True
+            start, columns = header
+            for row in rows[start + 1:]:
+                get = lambda prefix: _get_prefixed(row, columns, prefix)  # noqa: E731
+                stamp = get("時間戳記")
+                title = cell_text(get("歌曲名稱"))
+                if not isinstance(stamp, dt.datetime) or not title:
+                    continue
+                if timezone.is_naive(stamp):
+                    stamp = timezone.make_aware(stamp, timezone.get_current_timezone())
+                email = cell_text(get("電子信箱"))
+                name = cell_text(get("投稿人"))
+                entries[f"{stamp:%Y-%m-%dT%H:%M:%S}|{email or name}"] = {
+                    "stamp": stamp,
+                    "editor_name": name or "（未填）",
+                    "contact_email": email,
+                    "song_source": cell_text(get("歌曲出處")),
+                    "visual_source": cell_text(get("畫面出處")),
+                    "title": title,
+                    "file_link": cell_text(get("作品檔案")),
+                    "remarks": cell_text(get("備註")),
+                    "library_consent": cell_text(get("是否加入")).startswith("是"),
+                    "five_sec": cell_text(get("是否投稿5秒")).startswith("是"),
+                    "five_sec_link": cell_text(get("5秒檔案")),
+                    "guest_message": cell_text(get("想對我們說")),
+                }
+    finally:
+        workbook.close()
+
+    if not found_sheet:
+        raise SpreadsheetError("找不到 Google 表單回覆的欄位（需要 時間戳記、投稿人、歌曲名稱）")
+
+    existing = {s.external_id: s for s in festival.submissions.filter(source="guest").exclude(external_id="")}
+    created = updated = 0
+    with transaction.atomic():
+        for external_id, entry in entries.items():
+            stamp = entry.pop("stamp")
+            sub = existing.get(external_id)
+            is_new = sub is None
+            if is_new:
+                sub = Submission(festival=festival, source="guest", external_id=external_id)
+            for attr, value in entry.items():
+                setattr(sub, attr, value)
+            # 表單送出時就附了檔案，繳交時間記成表單時間
+            sub.uploaded_at = (sub.uploaded_at or stamp) if sub.file_link else None
+            sub.five_sec_uploaded_at = (sub.five_sec_uploaded_at or stamp) if sub.five_sec_link else None
+            sub.save()
+            if is_new:
+                # 報曲時間用表單送出時間，才能判斷有沒有超過亂入截止
+                Submission.objects.filter(pk=sub.pk).update(created_at=stamp)
+                created += 1
+            else:
+                updated += 1
+
+    report.add(f"亂入曲：新增 {created} 首、更新 {updated} 首")
+    if any(not e["file_link"] for e in entries.values()):
+        report.warn("有回覆沒有附作品檔案，會顯示為「已報曲」")
+    return report

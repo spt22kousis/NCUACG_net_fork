@@ -79,3 +79,6 @@ frontend/build/
 
 # Notion 匯出（含成員名單），不進 git
 Private & Shared/
+
+# 本機資料庫備份
+db.sqlite3.bak*

@@ -14,7 +14,7 @@ class ClubApiTests(TestCase):
         self.work = Work.objects.create(course=self.course, title="作品", external_url="https://example.com/a.mp4")
         self.alice = make_user("alice@example.test")
         self.bob = make_user("bob@example.test")
-        self.officer = make_user("officer@example.test", is_admin=True)
+        self.officer = make_user("officer@example.test", is_staff=True)
 
     def test_courses_include_published_work_count(self):
         Work.objects.create(course=self.course, title="下架", external_url="https://example.com/b.mp4", is_published=False)

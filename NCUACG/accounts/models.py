@@ -1,48 +1,85 @@
-from django.db import models
-from django.utils import timezone
+# NCUACG/accounts/models.py
 from datetime import timedelta
 
-class User(models.Model):
-    name = models.CharField(max_length=100)
-    email = models.EmailField(unique=True)
-    registered_at = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=False)
-    is_admin = models.BooleanField(default=False)
-    is_super_admin = models.BooleanField(default=False)
-    last_login = models.DateTimeField(blank=True, null=True)
+from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
+from django.contrib.auth.models import PermissionsMixin
+from django.db import models
+from django.utils import timezone
 
-    # DRF 的 IsAuthenticated 會讀 is_authenticated / is_anonymous。
-    # 這裡刻意用 property 而不是資料庫欄位：本專案走無狀態 JWT，
-    # 「有沒有登入」由 token 是否驗得過決定。先前存成 BooleanField 的做法，
-    # 登入時設 True、登出時卻沒有設回 False，等於變成「這個人有沒有登入過」。
-    @property
-    def is_authenticated(self) -> bool:
-        return True
 
-    @property
-    def is_anonymous(self) -> bool:
-        return False
+class UserManager(BaseUserManager):
+    use_in_migrations = True
+
+    def create_user(self, email, name, password=None, **extra_fields):
+        if not email:
+            raise ValueError("必須提供 email")
+        user = self.model(email=self.normalize_email(email), name=name, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, name, password=None, **extra_fields):
+        # createsuperuser 建立的帳號不需要再做信箱驗證
+        extra_fields.setdefault("is_active", True)
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        return self.create_user(email, name, password, **extra_fields)
+
+
+class User(AbstractBaseUser, PermissionsMixin):
+    """
+    全站唯一的帳號（settings.AUTH_USER_MODEL）。網站登入與 Django admin 共用同一組帳號。
+
+    角色：
+      - 社員：一般帳號
+      - 幹部：is_staff=True，可以登入 /admin 管理社課、作品、留言與活動（見 OFFICER_APP_LABELS）
+      - 超管：is_superuser=True，擁有全部權限（包括指定誰是幹部）
+    """
+
+    # 幹部在 Django admin 可以完整管理的 app；其他 app（帳號等）只有超管能動
+    OFFICER_APP_LABELS = {"club", "event"}
+
+    email = models.EmailField("email", unique=True)
+    name = models.CharField("名稱", max_length=100)
+    registered_at = models.DateTimeField("註冊時間", auto_now_add=True)
+    # 註冊後要點驗證信才會變成 True；未驗證的帳號不能登入
+    is_active = models.BooleanField("已驗證信箱", default=False)
+    is_staff = models.BooleanField(
+        "幹部",
+        default=False,
+        help_text="勾選後可以登入後台，管理社課、成果牆與活動。",
+    )
+
+    objects = UserManager()
+
+    USERNAME_FIELD = "email"
+    EMAIL_FIELD = "email"
+    REQUIRED_FIELDS = ["name"]
+
+    class Meta:
+        verbose_name = "帳號"
+        verbose_name_plural = "帳號"
 
     def __str__(self):
         return f"{self.name} ({self.email})"
 
+    # 幹部只要勾一個「幹部」就能管理社團內容，不必再逐一設定權限或群組
+    def has_perm(self, perm, obj=None):
+        if self.is_active and self.is_staff and perm.split(".", 1)[0] in self.OFFICER_APP_LABELS:
+            return True
+        return super().has_perm(perm, obj)
 
-class Credential(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='credential')
-    password_hash = models.CharField(max_length=256)
-
-    def __str__(self):
-        return f"(user_id={self.user.id})"
+    def has_module_perms(self, app_label):
+        if self.is_active and self.is_staff and app_label in self.OFFICER_APP_LABELS:
+            return True
+        return super().has_module_perms(app_label)
 
 
 class VerificationToken(models.Model):
-    user = models.ForeignKey("User", on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     token = models.CharField(max_length=64, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_used = models.BooleanField(default=False)
 
     def is_expired(self):
         return timezone.now() > self.created_at + timedelta(hours=24)
-
-
-

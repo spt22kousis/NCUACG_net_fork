@@ -1,4 +1,5 @@
 # NCUACG/club/models.py
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
@@ -86,7 +87,7 @@ class Work(models.Model):
 
 class WorkLike(models.Model):
     work = models.ForeignKey(Work, on_delete=models.CASCADE, related_name="likes")
-    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="work_likes")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="work_likes")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -97,7 +98,7 @@ class WorkLike(models.Model):
 
 class Comment(models.Model):
     work = models.ForeignKey(Work, on_delete=models.CASCADE, related_name="comments")
-    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="work_comments")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="work_comments")
     content = models.TextField(max_length=500)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -112,7 +113,7 @@ class Comment(models.Model):
 
 class CommentLike(models.Model):
     comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name="likes")
-    user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="comment_likes")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="comment_likes")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

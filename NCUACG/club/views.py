@@ -29,7 +29,7 @@ from .serializers import CommentCreateSerializer
 
 
 def _current_user(request):
-    """已登入回傳 accounts.User，訪客回傳 None。"""
+    """已登入回傳 User，訪客回傳 None。"""
     return request.user if getattr(request.user, "is_authenticated", False) else None
 
 
@@ -47,7 +47,7 @@ def _course_to_dict(c: Course) -> dict:
 
 
 def _is_officer(user) -> bool:
-    return user is not None and (user.is_admin or user.is_super_admin)
+    return user is not None and (user.is_staff or user.is_superuser)
 
 
 def _can_delete_comment(user, c: Comment) -> bool:

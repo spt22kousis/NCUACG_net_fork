@@ -75,7 +75,7 @@ pip install -r requirements.txt
 
 ```
 python manage.py migrate
-python manage.py createsuperuser   # 建立 Django admin 帳號（幹部上架作品、新增活動用）
+python manage.py createsuperuser   # 建立超管帳號（用 email 登入，網站與 /admin 共用）
 python manage.py runserver
 ```
 
@@ -90,6 +90,16 @@ npm run dev
 ```
 
 打開 http://localhost:5173 。前端的 `/api`、`/media` 會自動轉給本機的 Django（見 `vite.config.ts`），不需要另外設定網址。
+
+##### 帳號與幹部
+
+網站帳號就是後台帳號（`settings.AUTH_USER_MODEL = 'accounts.User'`），沒有第二套帳號：
+
+- **社員**：在網站註冊、點驗證信啟用。
+- **幹部**：超管在 http://localhost:8000/admin/ →「帳號」打開該社員，勾選「幹部」。之後他用同一組 email / 密碼登入 `/admin`，就能管理社課、作品、留言與活動。
+- **超管**：用 `createsuperuser` 建立，擁有全部權限（包括指定幹部）。
+
+> **從 2026/10 以前的版本更新的人**：帳號資料表改版了，舊的本機資料庫不相容。請把 `NCUACG/db.sqlite3` 刪掉（或改名備份），再重新 `python manage.py migrate` 與 `createsuperuser`。
 
 ##### 開發小提醒
 

@@ -10,6 +10,7 @@ from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 from datetime import timedelta
 import os
+import sys
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -78,11 +79,12 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'NCUACG.urls'
 
+# 全站唯一的帳號模型：網站登入與 Django admin 共用（見 accounts/models.py）
+AUTH_USER_MODEL = 'accounts.User'
+
 REST_FRAMEWORK = {
-    # 用自訂版本：內建的 JWTAuthentication 會去查 django.contrib.auth 的 User，
-    # 而本專案的使用者在 accounts.User（詳見 accounts/authentication.py）
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'accounts.authentication.CustomJWTAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     # 讓 API 輸出的時間統一用 ISO8601（含時區偏移）
     'DATETIME_FORMAT': "%Y-%m-%dT%H:%M:%S%z",
@@ -129,6 +131,10 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# 跑測試時改用快速的密碼雜湊；正式的 PBKDF2 故意很慢，測試會多花好幾倍時間
+if "test" in sys.argv:
+    PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

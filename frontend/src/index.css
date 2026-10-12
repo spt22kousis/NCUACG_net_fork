@@ -31,6 +31,11 @@ body {
   min-height: 100vh;
 }
 
+/* body 是 flex 置中，#root 不設寬度會縮成內容寬（App.css 沒有被 import，所以寫在這裡） */
+#root {
+  width: 100%;
+}
+
 h1 {
   font-size: 3.2em;
   line-height: 1.1;

@@ -61,6 +61,7 @@ def _festival_to_dict(f: Festival) -> dict:
         "endTime": f.end_time.strftime("%H:%M") if f.end_time else None,
         "description": f.description,
         "playCount": getattr(f, "play_count", 0),
+        "setlistPublic": f.setlist_public,
     }
 
 
@@ -132,7 +133,45 @@ def festival_detail(request, festival_id: int):
         Festival.objects.annotate(play_count=Count("plays")), pk=festival_id, is_published=True
     )
     plays = festival.plays.select_related("track")
-    return Response({**_festival_to_dict(festival), "plays": [_play_to_dict(p) for p in plays]})
+    data = {**_festival_to_dict(festival), "plays": [_play_to_dict(p) for p in plays], "sessions": []}
+    if festival.setlist_public:
+        data["sessions"] = _public_sessions(festival)
+    return Response(data)
+
+
+def _public_sessions(festival: Festival) -> list[dict]:
+    """排歌組公開的歌單（活動當天公布）。窗掉、退件的新曲不列出。"""
+    from .models import SetlistEntry
+
+    entries = (
+        SetlistEntry.objects.filter(session__festival=festival)
+        .select_related("session", "submission", "submission__festival", "track")
+        .order_by("session__order", "position")
+    )
+    sessions: dict[int, dict] = {}
+    for e in entries:
+        if e.kind == "new" and not e.submission.is_active:
+            continue
+        s = sessions.setdefault(e.session_id, {
+            "name": e.session.name,
+            "isTest": e.session.is_test,
+            "startTime": e.session.start_time.strftime("%H:%M"),
+            "entries": [],
+        })
+        if e.kind == "new":
+            label = {"guest": "亂入", "partner": festival.partner_name}.get(e.submission.source, "新曲")
+        elif e.kind == "old":
+            label = "舊曲"
+        else:
+            label = e.get_custom_type_display() or "其他"
+        s["entries"].append({
+            "position": len(s["entries"]) + 1,
+            "title": e.title,
+            "songSource": e.song_source,
+            "visualSource": e.visual_source,
+            "label": label,
+        })
+    return list(sessions.values())
 
 
 @api_view(["GET"])

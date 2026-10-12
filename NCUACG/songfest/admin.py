@@ -7,7 +7,7 @@ from django.template.response import TemplateResponse
 from django.urls import path
 
 from .importers import SpreadsheetError, import_songfest
-from .models import Festival, FestivalStaff, Play, Submission, SubmissionComment, Track
+from .models import Festival, FestivalStaff, Play, Session, SetlistEntry, Submission, SubmissionComment, Track
 
 
 class FestivalStaffInline(admin.TabularInline):
@@ -162,3 +162,19 @@ class SubmissionAdmin(admin.ModelAdmin):
     @admin.display(description="狀態")
     def status_label(self, obj):
         return Submission.STATUS_LABELS[obj.status()]
+
+
+class SetlistEntryInline(admin.TabularInline):
+    model = SetlistEntry
+    extra = 0
+    fields = ("position", "kind", "submission", "track", "custom_type", "custom_title", "custom_duration", "heat", "note")
+    raw_id_fields = ("submission", "track")
+
+
+@admin.register(Session)
+class SessionAdmin(admin.ModelAdmin):
+    """排歌平常在網站的「管理歌單 → 排歌」操作，這裡只是備用。"""
+
+    list_display = ("festival", "name", "order", "start_time", "end_time", "target_seconds", "owner")
+    list_filter = ("festival",)
+    inlines = [SetlistEntryInline]

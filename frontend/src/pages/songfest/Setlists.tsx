@@ -26,7 +26,8 @@ export function SetlistIndex() {
   const today = todayIso();
   const byYear = new Map<number, Festival[]>();
   for (const f of festivals ?? []) {
-    if (f.date >= today || f.playCount === 0) continue;
+    // 有播放紀錄的歷屆場次，加上排歌組已經公布歌單的場次（可能還沒舉辦）
+    if (!(f.playCount > 0 && f.date < today) && !f.setlistPublic) continue;
     const year = academicYear(f.date);
     byYear.set(year, [...(byYear.get(year) ?? []), f]);
   }
@@ -45,7 +46,7 @@ export function SetlistIndex() {
               <Link key={f.id} to={`/songfest/setlists/${f.id}`} className="sf-card sf-festival-card">
                 <strong>{f.name}</strong>
                 <span>{formatDate(f.date, true)}</span>
-                <span className="sf-muted">{f.playCount} 首</span>
+                <span className="sf-muted">{f.playCount > 0 ? `${f.playCount} 首` : '已公布歌單'}</span>
               </Link>
             ))}
           </div>
@@ -81,10 +82,38 @@ export function SetlistDetail() {
             <p className="sf-muted">
               {formatDate(festival.date, true)}
               {festival.venue && ` · ${festival.venue}`}
-              {` · ${festival.playCount} 首`}
+              {festival.playCount > 0 && ` · ${festival.playCount} 首`}
             </p>
           </div>
-          <p className="sf-muted sf-note">依播放紀錄試算表的順序列出；有 DVD 編號的是歌單裡對得到的那一支。</p>
+          {festival.playCount === 0 && festival.sessions.length > 0 && (
+            <>
+              <p className="sf-muted sf-note">排歌組公布的歌單，當天可能會有小調整。</p>
+              {festival.sessions.map(session => (
+                <section key={session.name} className="sf-section-tight">
+                  <h3 className="sf-section-title">{session.name} · {session.startTime}</h3>
+                  <ol className="sf-card sf-setlist">
+                    {session.entries.map(e => (
+                      <li key={e.position} className={e.label === '結尾影片' ? 'is-credits' : undefined}>
+                        <span className="sf-rank">{e.position}</span>
+                        <span className="sf-setlist-song">
+                          <strong>{e.title}</strong>
+                          <small>
+                            {e.visualSource && e.visualSource !== e.songSource
+                              ? `${e.songSource}（畫面：${e.visualSource}）`
+                              : e.songSource}
+                          </small>
+                        </span>
+                        <span className="sf-setlist-meta"><small>{e.label}</small></span>
+                      </li>
+                    ))}
+                  </ol>
+                </section>
+              ))}
+            </>
+          )}
+          {festival.playCount > 0 && (
+          <>
+          <p className="sf-muted sf-note">依播放紀錄的順序列出；有 DVD 編號的是歌單裡對得到的那一支。</p>
           <ol className="sf-card sf-setlist">
             {festival.plays.map(p => (
               <li key={p.position} className={p.isCredits ? 'is-credits' : undefined}>
@@ -108,6 +137,8 @@ export function SetlistDetail() {
               </li>
             ))}
           </ol>
+          </>
+          )}
         </>
       )}
     </SongfestLayout>

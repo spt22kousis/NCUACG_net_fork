@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import SongfestLayout from './SongfestLayout';
 import { DeadlineList } from './Submit';
+import SetlistBoard from './SetlistBoard';
+import AfterPanel from './AfterPanel';
 import { useAuth } from '../../contexts/auth';
 import { ADMIN_URL } from '../../config';
 import {
@@ -15,6 +17,13 @@ import {
 } from '../../api/songfest';
 
 type RowFilter = 'all' | 'pending' | 'warning' | 'inactive';
+type View = 'submissions' | 'setlist' | 'after';
+
+const VIEWS: { value: View; label: string }[] = [
+  { value: 'submissions', label: '投稿總覽' },
+  { value: 'setlist', label: '排歌' },
+  { value: 'after', label: '活動後' },
+];
 
 const ROW_FILTERS: { value: RowFilter; label: string }[] = [
   { value: 'all', label: '全部' },
@@ -210,6 +219,7 @@ export default function Manage() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reminder, setReminder] = useState<string | null>(null);
+  const [view, setView] = useState<View>('submissions');
   const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -303,12 +313,25 @@ export default function Manage() {
           </select>
         </label>
         {festivals?.length === 0 && <span className="sf-muted">你目前沒有負責的場次。</span>}
+        <div className="sf-toggle" role="tablist" aria-label="管理歌單">
+          {VIEWS.map(v => (
+            <button key={v.value} type="button" role="tab" aria-selected={view === v.value}
+              className={view === v.value ? 'is-active' : ''} onClick={() => setView(v.value)}>
+              {v.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error && <p className="sf-error" role="alert">{error}</p>}
       {notice && <p className="sf-notice" role="status">{notice}</p>}
 
-      {data && summary && (
+      {view === 'setlist' && festivalId !== null && <SetlistBoard key={festivalId} festivalId={festivalId} />}
+      {view === 'after' && festivalId !== null && data && (
+        <AfterPanel key={festivalId} festivalId={festivalId} festivalName={data.festival.name} />
+      )}
+
+      {view === 'submissions' && data && summary && (
         <>
           <section className="sf-card sf-festival-panel">
             <DeadlineList festival={data.festival} />

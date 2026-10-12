@@ -1,5 +1,6 @@
 from django.urls import path
 
+from . import setlist_views as st
 from . import submission_views as sv
 from . import views
 
@@ -26,4 +27,20 @@ urlpatterns = [
     path("manage/submissions/<int:submission_id>/", sv.manage_submission, name="songfest_manage_submission"),
     path("festivals/<int:festival_id>/manage/export/", sv.manage_export, name="songfest_manage_export"),
     path("festivals/<int:festival_id>/manage/import-guests/", sv.manage_import_guests, name="songfest_import_guests"),
+
+    # 排歌台（setlist_views.py）
+    path("festivals/<int:festival_id>/setlist/", st.board, name="songfest_setlist"),
+    path("festivals/<int:festival_id>/setlist/auto/", st.auto, name="songfest_setlist_auto"),
+    path("festivals/<int:festival_id>/setlist/suggest/", st.suggest, name="songfest_setlist_suggest"),
+    path("festivals/<int:festival_id>/setlist/export/", st.export, name="songfest_setlist_export"),
+    path("festivals/<int:festival_id>/setlist/publish/", st.publish, name="songfest_setlist_publish"),
+    path("festivals/<int:festival_id>/setlist/write-plays/", st.write_plays, name="songfest_setlist_write_plays"),
+    path("setlist/sessions/<int:session_id>/", st.session_detail, name="songfest_session"),
+    path("setlist/sessions/<int:session_id>/entries/", st.entry_create, name="songfest_entry_create"),
+    path("setlist/entries/<int:entry_id>/", st.entry_detail, name="songfest_entry"),
+    path("festivals/<int:festival_id>/library/", st.library, name="songfest_library"),
+    path("festivals/<int:festival_id>/library/add/", st.library_add, name="songfest_library_add"),
+    path("festivals/<int:festival_id>/library/export/", st.library_export, name="songfest_library_export"),
+    path("library-consent/", st.my_library_consent, name="songfest_my_library_consent"),
+    path("submissions/<int:submission_id>/library-consent/", st.library_consent, name="songfest_library_consent"),
 ]

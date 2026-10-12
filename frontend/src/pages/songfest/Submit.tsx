@@ -9,7 +9,8 @@ import { useAuth } from '../../contexts/auth';
 import {
   FIVE_SEC_LABEL, STATUS_LABEL, apiErrorMessage, deleteSubmission, fetchActiveFestival, fetchMySubmissions,
   fetchReportThread, formatDate, formatDateTime, formatDuration, isPast, withdrawSubmission,
-  type ActiveFestival, type MySubmission, type SongfestFestival, type SubmissionPublic,
+  fetchMyLibraryConsent, setLibraryConsent,
+  type ActiveFestival, type LibraryConsentItem, type MySubmission, type SongfestFestival, type SubmissionPublic,
 } from '../../api/songfest';
 
 export function DeadlineList({ festival, guest = false }: { festival: SongfestFestival; guest?: boolean }) {
@@ -164,6 +165,33 @@ function ThreadRow({ sub }: { sub: SubmissionPublic }) {
   );
 }
 
+/** 活動結束後的「入歌單回報」：同意的新曲之後可能以舊曲形式在歌謠祭播出 */
+function LibraryConsentCard() {
+  const [items, setItems] = useState<LibraryConsentItem[]>([]);
+
+  useEffect(() => {
+    fetchMyLibraryConsent().then(setItems).catch(() => setItems([]));
+  }, []);
+
+  if (items.length === 0) return null;
+  const toggle = async (item: LibraryConsentItem) => {
+    await setLibraryConsent(item.submissionId, !item.consent);
+    setItems(items.map(i => (i.submissionId === item.submissionId ? { ...i, consent: !i.consent } : i)));
+  };
+  return (
+    <section className="sf-card sf-festival-panel">
+      <h2>入歌單回報</h2>
+      <p className="sf-hint">勾選同意的歌會收進中央動畫社歌單，之後可能在歌謠祭以舊曲的形式播出。</p>
+      {items.map(item => (
+        <label key={item.submissionId} className="sf-check">
+          <input type="checkbox" checked={item.consent} onChange={() => void toggle(item)} />
+          {item.festivalName}〈{item.title}〉
+        </label>
+      ))}
+    </section>
+  );
+}
+
 export default function Submit() {
   const { isAuthenticated } = useAuth();
   const [active, setActive] = useState<ActiveFestival | null>(null);
@@ -199,6 +227,8 @@ export default function Submit() {
 
       {error && <p className="sf-error">載入失敗，請稍後再試。</p>}
       {!error && active === null && <p className="sf-muted">載入中…</p>}
+      {/* 活動結束後下一場可能還沒建立，所以放在場次之外 */}
+      {isAuthenticated && <LibraryConsentCard />}
       {active !== null && festival === null && (
         <div className="sf-card sf-empty">目前沒有準備中的歌謠祭。下一場的投稿時間會公告在社團 Discord。</div>
       )}

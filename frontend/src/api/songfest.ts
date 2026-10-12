@@ -12,6 +12,7 @@ export interface Festival {
   endTime: string | null;
   description: string;
   playCount: number;
+  setlistPublic: boolean; // 排歌組已經公布排好的歌單
 }
 
 export interface Play {
@@ -24,8 +25,16 @@ export interface Play {
   isCredits: boolean;     // 結尾的 5 秒畫面合輯影片
 }
 
+export interface PublicSession {
+  name: string;
+  isTest: boolean;
+  startTime: string;
+  entries: { position: number; title: string; songSource: string; visualSource: string; label: string }[];
+}
+
 export interface FestivalDetail extends Festival {
   plays: Play[];
+  sessions: PublicSession[]; // 公布的排好歌單；沒公布是空陣列
 }
 
 export interface Track {
@@ -279,6 +288,7 @@ export interface StaffUpdate {
   rejectReason?: string;
   penaltyWaived?: boolean;
   duration?: number | null;
+  libraryConsent?: boolean;
 }
 
 export async function fetchActiveFestival(): Promise<ActiveFestival> {
@@ -339,15 +349,19 @@ export async function staffUpdateSubmission(id: number, input: StaffUpdate): Pro
   return (await api.patch<StaffSubmission>(`/songfest/manage/submissions/${id}/`, input)).data;
 }
 
-/** 下載 CSV：要帶登入 token，所以用 axios 拿檔案再交給瀏覽器存檔 */
-export async function downloadSubmissionCsv(festivalId: number, filename: string): Promise<void> {
-  const res = await api.get<Blob>(`/songfest/festivals/${festivalId}/manage/export/`, { responseType: 'blob' });
+/** 下載檔案：要帶登入 token，所以用 axios 拿檔案再交給瀏覽器存檔 */
+async function downloadFile(path: string, filename: string, params?: Record<string, string>): Promise<void> {
+  const res = await api.get<Blob>(path, { responseType: 'blob', params });
   const url = URL.createObjectURL(res.data);
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+export async function downloadSubmissionCsv(festivalId: number, filename: string): Promise<void> {
+  await downloadFile(`/songfest/festivals/${festivalId}/manage/export/`, filename);
 }
 
 export async function importGuestForm(festivalId: number, file: File): Promise<{ lines: string[]; warnings: string[] }> {
@@ -396,4 +410,188 @@ export function apiErrorMessage(err: unknown, fallback = '送出失敗，請稍�
     if (text) return text;
   }
   return fallback;
+}
+
+// ── 排歌台（對應後端 NCUACG/songfest/setlist_views.py）──────────────────────
+
+export type EntryKind = 'new' | 'old' | 'custom';
+export type CustomType = 'cm' | 'credits' | 'other';
+
+export interface SetlistEntry {
+  id: number;
+  position: number;
+  kind: EntryKind;
+  customType: CustomType | '';
+  title: string;
+  songSource: string;
+  visualSource: string;
+  editor: string;
+  dvdCode: string | null;
+  submissionId: number | null;
+  source: SubmissionSource | null;
+  sourceLabel: string;     // 新曲、舊曲、亂入、健行科大、CM、結尾影片…
+  isBackup: boolean;
+  duration: number | null;
+  endsAt: string;          // 這首播完的時刻 HH:MM:SS（含每首誤差）
+  heat: number | null;
+  note: string;
+  lastPlayed: string | null;
+  recentPlayCount: number | null;
+  warnings: string[];
+}
+
+export interface SetlistSession {
+  id: number;
+  name: string;
+  isTest: boolean;
+  startTime: string;
+  endTime: string | null;
+  targetSeconds: number | null;
+  toleranceSeconds: number;
+  speechSeconds: number;
+  bufferSeconds: number;
+  perSongErrorSeconds: number;
+  rounds: number;
+  ownerId: number | null;
+  ownerName: string | null;
+  totalSeconds: number;
+  errorSeconds: number;
+  speechAt: string;
+  endAt: string;
+  latestEndAt: string;
+  over: boolean;
+  under: boolean;
+  suggestedStart: string | null;
+  warnings: string[];
+  entries: SetlistEntry[];
+}
+
+export interface PoolItem {
+  submissionId: number;
+  title: string;
+  songSource: string;
+  visualSource: string;
+  editor: string;
+  source: SubmissionSource;
+  sourceLabel: string;
+  isBackup: boolean;
+  duration: number | null;
+  status: SubmissionStatus;
+  chainWith: number | null;
+}
+
+export interface SetlistBoard {
+  festival: SongfestFestival & { setlistPublic: boolean };
+  staff: { id: number; name: string; role: string }[];
+  sessions: SetlistSession[];
+  pool: PoolItem[];
+  warnings: string[];
+}
+
+export interface EntryInput {
+  kind?: EntryKind;
+  submissionId?: number;
+  dvdCode?: string;
+  customType?: CustomType;
+  title?: string;
+  source?: string;
+  editor?: string;
+  duration?: number | null;
+  sessionId?: number;
+  position?: number;
+  heat?: number | null;
+  note?: string;
+}
+
+export interface SessionInput {
+  startTime?: string;
+  endTime?: string | null;
+  targetSeconds?: number | null;
+  speechSeconds?: number;
+  bufferSeconds?: number;
+  perSongErrorSeconds?: number;
+  rounds?: number;
+  ownerId?: number | null;
+}
+
+export async function fetchSetlist(festivalId: number): Promise<SetlistBoard> {
+  return (await api.get<SetlistBoard>(`/songfest/festivals/${festivalId}/setlist/`)).data;
+}
+
+export async function autoDistribute(festivalId: number): Promise<SetlistBoard & { placed: number }> {
+  return (await api.post(`/songfest/festivals/${festivalId}/setlist/auto/`)).data;
+}
+
+export async function updateSession(sessionId: number, input: SessionInput): Promise<SetlistBoard> {
+  return (await api.patch<SetlistBoard>(`/songfest/setlist/sessions/${sessionId}/`, input)).data;
+}
+
+export async function addEntry(sessionId: number, input: EntryInput): Promise<SetlistBoard> {
+  return (await api.post<SetlistBoard>(`/songfest/setlist/sessions/${sessionId}/entries/`, input)).data;
+}
+
+export async function updateEntry(entryId: number, input: EntryInput): Promise<SetlistBoard> {
+  return (await api.patch<SetlistBoard>(`/songfest/setlist/entries/${entryId}/`, input)).data;
+}
+
+export async function deleteEntry(entryId: number): Promise<SetlistBoard> {
+  return (await api.delete<SetlistBoard>(`/songfest/setlist/entries/${entryId}/`)).data;
+}
+
+export async function fetchFillSuggestions(festivalId: number, seconds: number): Promise<Track[]> {
+  return (await api.get<Track[]>(`/songfest/festivals/${festivalId}/setlist/suggest/`, { params: { seconds } })).data;
+}
+
+export type SetlistExport = 'public' | 'workspace' | 'order' | 'credits';
+
+export async function downloadSetlist(festivalId: number, type: SetlistExport, filename: string): Promise<void> {
+  await downloadFile(`/songfest/festivals/${festivalId}/setlist/export/`, filename, { type });
+}
+
+export async function publishSetlist(festivalId: number, isPublic: boolean): Promise<{ setlistPublic: boolean }> {
+  return (await api.post(`/songfest/festivals/${festivalId}/setlist/publish/`, { public: isPublic })).data;
+}
+
+export async function writePlays(festivalId: number): Promise<{ written: number }> {
+  return (await api.post(`/songfest/festivals/${festivalId}/setlist/write-plays/`)).data;
+}
+
+export interface LibraryCandidate {
+  submissionId: number;
+  title: string;
+  songSource: string;
+  visualSource: string;
+  artist: string;
+  editor: string;
+  source: SubmissionSource;
+  duration: number | null;
+  libraryConsent: boolean;
+  dvdCode: string | null; // 已經收進歌單的話
+}
+
+export async function fetchLibraryCandidates(festivalId: number): Promise<LibraryCandidate[]> {
+  return (await api.get<LibraryCandidate[]>(`/songfest/festivals/${festivalId}/library/`)).data;
+}
+
+export async function addToLibrary(festivalId: number, submissionIds: number[]): Promise<{ added: string[]; candidates: LibraryCandidate[] }> {
+  return (await api.post(`/songfest/festivals/${festivalId}/library/add/`, { submissionIds })).data;
+}
+
+export async function downloadLibraryCsv(festivalId: number, filename: string): Promise<void> {
+  await downloadFile(`/songfest/festivals/${festivalId}/library/export/`, filename);
+}
+
+export interface LibraryConsentItem {
+  submissionId: number;
+  festivalName: string;
+  title: string;
+  consent: boolean;
+}
+
+export async function fetchMyLibraryConsent(): Promise<LibraryConsentItem[]> {
+  return (await api.get<LibraryConsentItem[]>('/songfest/library-consent/')).data;
+}
+
+export async function setLibraryConsent(submissionId: number, consent: boolean): Promise<void> {
+  await api.post(`/songfest/submissions/${submissionId}/library-consent/`, { consent });
 }

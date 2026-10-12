@@ -54,6 +54,9 @@ class Festival(models.Model):
     guest_form_url = models.URLField("亂入曲 Google 表單網址", blank=True)
     guest_info = models.TextField("亂入投稿說明", blank=True, help_text="顯示在亂入投稿說明頁")
 
+    # 排歌台排好的歌單要不要公開在「歌單瀏覽」（通常是活動當天或前一天公布）
+    setlist_public = models.BooleanField("公開排好的歌單", default=False)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -271,6 +274,11 @@ class Submission(models.Model):
     library_consent = models.BooleanField("同意收進社團歌單", default=False)
     guest_message = models.TextField("想對我們說的話", blank=True)
     external_id = models.CharField("表單回覆識別碼", max_length=200, blank=True, db_index=True, editable=False)
+    # 活動結束後收進社團歌單，變成舊曲
+    track = models.ForeignKey(
+        "Track", on_delete=models.SET_NULL, null=True, blank=True, related_name="submissions",
+        verbose_name="收進歌單後的舊曲",
+    )
 
     song_key = models.CharField(max_length=255, db_index=True, editable=False)
     created_at = models.DateTimeField("報曲時間", auto_now_add=True)
@@ -367,3 +375,113 @@ class SubmissionComment(models.Model):
 
     def __str__(self) -> str:
         return f"{self.user.name}：{self.content[:20]}"
+
+
+class Session(models.Model):
+    """
+    一場歌謠祭裡的一個時段：測試曲、上午場、下午一、下午二。
+    預設值照排歌組工作區（見 setlist.DEFAULT_SESSIONS），通常不用改。
+    """
+
+    festival = models.ForeignKey(Festival, on_delete=models.CASCADE, related_name="sessions", verbose_name="場次")
+    name = models.CharField("名稱", max_length=20)
+    order = models.PositiveSmallIntegerField("順序", default=0)
+    is_test = models.BooleanField("測試曲", default=False, help_text="開場前輪播，不算進正式歌單")
+    start_time = models.TimeField("開播時刻")
+    end_time = models.TimeField("結束時刻", null=True, blank=True)
+    target_seconds = models.PositiveIntegerField("目標長度（秒）", null=True, blank=True)
+    tolerance_seconds = models.PositiveIntegerField("可超過（秒）", default=120)
+    speech_seconds = models.PositiveIntegerField("內場負責人講話（秒）", default=60)
+    buffer_seconds = models.PositiveIntegerField("預留錯誤處理（秒）", default=240)
+    per_song_error_seconds = models.PositiveSmallIntegerField("PotPlayer 每首誤差（秒）", default=1)
+    rounds = models.PositiveSmallIntegerField("輪數", default=1, help_text="測試曲重複播放幾輪")
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="songfest_sessions", verbose_name="負責排歌",
+    )
+
+    class Meta:
+        ordering = ["festival", "order", "id"]
+        verbose_name = "歌單時段"
+        verbose_name_plural = "歌單時段"
+
+    def __str__(self) -> str:
+        return f"{self.festival.name} {self.name}"
+
+
+class SetlistEntry(models.Model):
+    """時段裡的一首：這次的新曲、歌單裡的舊曲，或自己填的項目（CM、結尾影片、社外舊曲…）。"""
+
+    KIND_CHOICES = [
+        ("new", "新曲"),
+        ("old", "舊曲"),
+        ("custom", "其他"),
+    ]
+    CUSTOM_TYPE_CHOICES = [
+        ("cm", "CM"),
+        ("credits", "結尾影片"),
+        ("other", "其他"),
+    ]
+
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name="entries", verbose_name="時段")
+    position = models.PositiveIntegerField("順序")
+    kind = models.CharField("種類", max_length=10, choices=KIND_CHOICES)
+    submission = models.ForeignKey(
+        Submission, on_delete=models.CASCADE, null=True, blank=True, related_name="setlist_entries"
+    )
+    track = models.ForeignKey(Track, on_delete=models.PROTECT, null=True, blank=True, related_name="setlist_entries")
+    custom_type = models.CharField("其他項目類型", max_length=10, choices=CUSTOM_TYPE_CHOICES, blank=True)
+    custom_title = models.CharField("曲名／名稱", max_length=255, blank=True)
+    custom_source = models.CharField("作品", max_length=255, blank=True)
+    custom_editor = models.CharField("製作者", max_length=100, blank=True)
+    custom_duration = models.PositiveIntegerField("長度（秒）", null=True, blank=True)
+    heat = models.PositiveSmallIntegerField("熱度", null=True, blank=True)
+    note = models.CharField("備註", max_length=200, blank=True)
+
+    class Meta:
+        ordering = ["session", "position", "id"]
+        verbose_name = "歌單項目"
+        verbose_name_plural = "歌單項目"
+
+    def __str__(self) -> str:
+        return f"{self.session} #{self.position} {self.title}"
+
+    @property
+    def title(self) -> str:
+        if self.kind == "new":
+            return self.submission.title
+        if self.kind == "old":
+            return self.track.title
+        return self.custom_title
+
+    @property
+    def song_source(self) -> str:
+        if self.kind == "new":
+            return self.submission.song_source
+        if self.kind == "old":
+            return self.track.song_source
+        return self.custom_source
+
+    @property
+    def visual_source(self) -> str:
+        if self.kind == "new":
+            return self.submission.visual_source
+        if self.kind == "old":
+            return self.track.visual_source
+        return self.custom_source
+
+    @property
+    def editor(self) -> str:
+        if self.kind == "new":
+            return self.submission.editor_name
+        if self.kind == "old":
+            return self.track.editor
+        return self.custom_editor
+
+    @property
+    def duration(self):
+        if self.kind == "new":
+            return self.submission.duration_seconds
+        if self.kind == "old":
+            return self.track.duration_seconds
+        return self.custom_duration

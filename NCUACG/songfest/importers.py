@@ -247,8 +247,15 @@ def sync_tracks(songs: list[SongRow], report: ImportReport, prune: bool = False)
     missing = sorted(set(existing) - {s.dvd_code for s in songs})
     if missing:
         if prune:
-            Track.objects.filter(dvd_code__in=missing).delete()
-            report.add(f"已刪除試算表裡沒有的 {len(missing)} 首：{'、'.join(missing[:10])}")
+            # 已經排進歌單的舊曲不能刪，不然排好的歌單會壞掉
+            in_setlist = set(
+                Track.objects.filter(dvd_code__in=missing, setlist_entries__isnull=False).values_list("dvd_code", flat=True)
+            )
+            deletable = [code for code in missing if code not in in_setlist]
+            Track.objects.filter(dvd_code__in=deletable).delete()
+            report.add(f"已刪除試算表裡沒有的 {len(deletable)} 首：{'、'.join(deletable[:10])}")
+            if in_setlist:
+                report.warn(f"{len(in_setlist)} 首已經排進歌單，沒有刪除：{'、'.join(sorted(in_setlist)[:10])}")
         else:
             report.warn(
                 f"網站上有 {len(missing)} 首試算表裡沒有（沒有刪除，要刪請勾選「刪除試算表沒有的舊曲」）："

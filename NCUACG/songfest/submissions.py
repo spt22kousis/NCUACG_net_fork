@@ -352,10 +352,12 @@ class StaffUpdateInput(serializers.Serializer):
     rejectReason = serializers.CharField(max_length=200, required=False, allow_blank=True)
     penaltyWaived = serializers.BooleanField(required=False)
     duration = duration_field()
+    libraryConsent = serializers.BooleanField(required=False)
 
     FIELDS = {
         "fileChecked": "file_checked", "extendedUntil": "extended_until", "isRejected": "is_rejected",
         "rejectReason": "reject_reason", "penaltyWaived": "penalty_waived", "duration": "duration_seconds",
+        "libraryConsent": "library_consent",
     }
 
     def apply(self, sub: Submission) -> Submission:

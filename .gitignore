@@ -82,3 +82,6 @@ Private & Shared/
 
 # 本機資料庫備份
 db.sqlite3.bak*
+
+# AI
+.claude/

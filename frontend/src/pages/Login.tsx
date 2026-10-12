@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/auth';
 import type { User } from '../contexts/auth';
 import Sidebar from '../components/Sidebar';
 import { isAxiosError } from 'axios';
-import { api, setTokens } from '../api/client';
+import { api, clearTokens, setTokens } from '../api/client';
 import '../styles/Login.css';
 
 interface CaptchaResponse {
@@ -40,6 +40,8 @@ export default function Login() {
       setMessage("你的帳號密碼咧?");
       return;
     }
+   // 登入成功、token 已存起來之後，若 /me/ 失敗要把 token 收回，避免「畫面說失敗、其實半登入」
+   let tokensSaved = false;
    try {
     // 登入
     const loginRes = await api.post(
@@ -57,6 +59,7 @@ export default function Login() {
 
     // 交給 api client 統一保管；之後每個請求的 Authorization 都由攔截器帶上
     setTokens(accessToken, refreshToken);
+    tokensSaved = true;
 
     // 成功 → 抓 /api/me/ 更新 Context
     const meRes = await api.get<User>('/me/');
@@ -69,6 +72,12 @@ export default function Login() {
     // 驗證碼是一次性的（不論答對答錯，後端都會作廢），失敗後一定要換一張新的，
     // 否則使用者照著畫面上的舊圖重試只會一直得到「驗證碼已失效」
     loadCaptcha();
+
+    if (tokensSaved) {
+      clearTokens();
+      setMessage('讀取個人資料失敗，請稍後重新登入');
+      return;
+    }
 
     // 後端回 DRF 標準格式：{"captcha": ["驗證碼錯誤"]}、{"useremail": ["帳號或密碼錯誤"]}
     const data: unknown = isAxiosError(err) ? err.response?.data : undefined;

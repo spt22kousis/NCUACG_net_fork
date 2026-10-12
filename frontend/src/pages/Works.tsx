@@ -28,6 +28,7 @@ interface Course {
   name: string;
   color: 'blue' | 'green';
   category: string;
+  workCount: number; // 已上架作品數
 }
 
 interface Work {
@@ -40,7 +41,7 @@ interface Work {
   thumbnail: string | null;
   likes: number;
   views: number;
-  comments: Comment[];
+  commentCount: number; // 留言本體在開啟留言欄時另外抓
   isLiked: boolean;
   createdAt: string;
 }
@@ -74,6 +75,8 @@ const Works: React.FC = () => {
   const [works, setWorks] = useState<Work[]>([]);
   // 只存 id，作品內容一律從 works 取，按讚/留言更新 works 時畫面才會同步
   const [selectedWorkId, setSelectedWorkId] = useState<number | null>(null);
+  // 目前作品的留言（開啟留言欄時才抓）
+  const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>({ type: 'time', direction: 'desc' });
@@ -103,6 +106,14 @@ const Works: React.FC = () => {
     if (target) setSelectedWorkId(target.id);
   };
 
+  // 沒有社課可選時，作品 effect 不會跑，要自己把上一個種類的作品清掉
+  const clearWorks = (error: string | null) => {
+    setWorks([]);
+    setSelectedWorkId(null);
+    setLoadError(error);
+    setLoading(false);
+  };
+
   // 社課列表
   useEffect(() => {
     let cancelled = false;
@@ -110,13 +121,16 @@ const Works: React.FC = () => {
       .then(res => {
         if (cancelled) return;
         setCourses(res.data);
-        setSelectedCourse(prev => (res.data.some(c => c.id === prev) ? prev : res.data[0]?.id ?? ''));
-        if (res.data.length === 0) setLoading(false);
+        // 預設選第一個有作品的社課（跳過「關於聲優社課」這類空分類），都沒有才選第一個
+        const fallback = (res.data.find(c => c.workCount > 0) ?? res.data[0])?.id ?? '';
+        setSelectedCourse(prev => (res.data.some(c => c.id === prev) ? prev : fallback));
+        if (res.data.length === 0) clearWorks(null);
       })
       .catch(() => {
         if (cancelled) return;
-        setLoadError('社課列表載入失敗，請稍後再試');
-        setLoading(false);
+        setCourses([]);
+        setSelectedCourse('');
+        clearWorks('社課列表載入失敗，請稍後再試');
       });
     return () => { cancelled = true; };
   }, [category]);
@@ -147,6 +161,25 @@ const Works: React.FC = () => {
       });
     return () => { cancelled = true; };
   }, [selectedCourse, sortOption.type, sortOption.direction]);
+
+  // 登出（含攔截器續命失敗的強制登出）後，畫面上的「已按讚」要跟著收掉
+  useEffect(() => {
+    if (isAuthenticated || getAccessToken()) return;
+    setWorks(prev => (prev.some(w => w.isLiked) ? prev.map(w => ({ ...w, isLiked: false })) : prev));
+    setComments(prev => (prev.some(c => c.isLiked) ? prev.map(c => ({ ...c, isLiked: false })) : prev));
+  }, [isAuthenticated]);
+
+  // 開啟留言欄或換作品時抓留言
+  useEffect(() => {
+    if (!showComments || selectedWorkId == null) return;
+    let cancelled = false;
+    const id = selectedWorkId;
+    setComments([]);
+    api.get<Comment[]>(`/club/works/${id}/comments/`)
+      .then(res => { if (!cancelled) setComments(res.data); })
+      .catch(() => { /* 留言載入失敗時留言欄保持空白 */ });
+    return () => { cancelled = true; };
+  }, [showComments, selectedWorkId]);
 
   // 換作品時：播放狀態歸零，並把瀏覽數 +1
   useEffect(() => {
@@ -183,17 +216,17 @@ const Works: React.FC = () => {
     }));
   };
 
-  // 播放器控制
+  // 播放器控制：isPlaying 由 <video> 的 play/pause/ended 事件同步，這裡只下指令
   const togglePlay = useCallback(() => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      // 檔案 404、格式不支援時 play() 會 reject；狀態維持「暫停」即可
+      video.play().catch(() => setIsPlaying(false));
+    } else {
+      video.pause();
     }
-  }, [isPlaying]);
+  }, []);
 
   const skipTime = useCallback((seconds: number) => {
     if (videoRef.current) {
@@ -251,7 +284,8 @@ const Works: React.FC = () => {
     const workId = selectedWork.id;
     try {
       const res = await api.post<Comment>(`/club/works/${workId}/comments/`, { content });
-      setWorks(prev => prev.map(w => (w.id === workId ? { ...w, comments: [...w.comments, res.data] } : w)));
+      if (workId === selectedWorkId) setComments(prev => [...prev, res.data]);
+      setWorks(prev => prev.map(w => (w.id === workId ? { ...w, commentCount: w.commentCount + 1 } : w)));
       setNewComment('');
     } catch (err) {
       if (isAxiosError<{ content?: string[] }>(err)) {
@@ -264,17 +298,12 @@ const Works: React.FC = () => {
   };
 
   const toggleCommentLike = async (comment: Comment) => {
-    if (!selectedWork || !canTry('按讚')) return;
-    const workId = selectedWork.id;
+    if (!canTry('按讚')) return;
     try {
       const res = comment.isLiked
         ? await api.delete<LikeResult>(`/club/comments/${comment.id}/like/`)
         : await api.post<LikeResult>(`/club/comments/${comment.id}/like/`);
-      setWorks(prev => prev.map(w => (
-        w.id !== workId
-          ? w
-          : { ...w, comments: w.comments.map(c => (c.id === comment.id ? { ...c, ...res.data } : c)) }
-      )));
+      setComments(prev => prev.map(c => (c.id === comment.id ? { ...c, ...res.data } : c)));
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 401) askLogin('按讚');
       else alert('操作失敗，請稍後再試');
@@ -456,7 +485,7 @@ const Works: React.FC = () => {
                 >
                   <MessageCircle className="w-4 h-4 text-gray-600" />
                 </button>
-                <span className="stat-count">{selectedWork.comments.length}</span>
+                <span className="stat-count">{selectedWork.commentCount}</span>
               </div>
             
               <div className="stat-group">
@@ -481,6 +510,9 @@ const Works: React.FC = () => {
                           className="video-element"
                           src={selectedWork.url}
                           onClick={togglePlay}
+                          onPlay={() => setIsPlaying(true)}
+                          onPause={() => setIsPlaying(false)}
+                          onEnded={() => setIsPlaying(false)}
                         />
                       </div>
                     
@@ -601,11 +633,11 @@ const Works: React.FC = () => {
             {showComments && (
               <div className="comments-sidebar">
                 <div className="comments-header">
-                  <h3 className="comments-title">留言 ({selectedWork.comments.length})</h3>
+                  <h3 className="comments-title">留言 ({selectedWork.commentCount})</h3>
                 </div>
               
                 <div className="comments-list">
-                  {selectedWork.comments.map((comment) => (
+                  {comments.map((comment) => (
                     <div key={comment.id} className="comment-item">
                       <div className="comment-avatar">
                         {comment.username.slice(0, 1)}

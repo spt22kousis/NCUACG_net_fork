@@ -24,23 +24,15 @@ import os
 import logging
 from accounts.serializers import RegisterSerializer, LoginSerializer, CustomTokenRefreshSerializer
 from rest_framework_simplejwt.views import TokenRefreshView
-from rest_framework_simplejwt.authentication import JWTAuthentication
 import traceback
-from accounts.tokentest import JWTtest
-import jwt
-from django.conf import settings
-from rest_framework_simplejwt.exceptions import InvalidToken  # ←這裡
-from rest_framework.exceptions import AuthenticationFailed    # ←這裡
-from accounts.authentication import CustomJWTAuthentication
 logger = logging.getLogger(__name__)
 
 class UserProfileView(APIView):
-    authentication_classes = [CustomJWTAuthentication]
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:
-            user = request.user  # 這裡會是 CustomJWTAuthentication 回傳的 User
+            user = request.user  # 全站預設的 CustomJWTAuthentication 回傳的 accounts.User
 
             role = "member"
             if getattr(user, "is_super_admin", False):

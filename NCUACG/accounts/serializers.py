@@ -73,9 +73,9 @@ class LoginSerializer(serializers.Serializer):
             user.save(update_fields=["last_login"])
 
         # 簽發 JWT
-        refresh = RefreshToken.for_user(user) 
-        refresh['id'] = int(user.pk)
-        refresh["user_id"] = int(user.pk)  # 加這行
+        # for_user 會依 SIMPLE_JWT 的 USER_ID_CLAIM（'id'）放入使用者 id，
+        # 驗證端（accounts/authentication.py）也讀同一個設定，不要再手動塞其他 claim
+        refresh = RefreshToken.for_user(user)
         attrs['user'] = user
         attrs['access'] = str(refresh.access_token)
         attrs['refresh'] = str(refresh)

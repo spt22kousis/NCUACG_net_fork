@@ -68,6 +68,13 @@ async function refreshAccessToken(): Promise<string> {
   return access;
 }
 
+/** refresh token 本身被拒（沒有、過期、帳號停用），而不是網路或伺服器暫時出錯 */
+function isRefreshRejected(err: unknown): boolean {
+  if (!axios.isAxiosError(err)) return true; // 手上沒有 refresh token、或回應缺 access
+  const status = err.response?.status;
+  return status === 400 || status === 401;
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -90,7 +97,13 @@ api.interceptors.response.use(
       const access = await refreshPromise;
       original.headers.Authorization = `Bearer ${access}`;
       return api(original);
-    } catch {
+    } catch (refreshError) {
+      // 斷線、後端 5xx、重啟中這類暫時性錯誤不代表 refresh token 失效，
+      // 保留憑證、照原本的錯誤失敗即可，等後端恢復後下一個請求還能續命
+      if (!isRefreshRejected(refreshError)) {
+        return Promise.reject(error);
+      }
+
       // refresh 也失效了：清掉憑證並通知全站
       clearTokens();
       try {

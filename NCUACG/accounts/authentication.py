@@ -2,6 +2,7 @@
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken
+from rest_framework_simplejwt.settings import api_settings
 
 from accounts.models import User
 
@@ -17,7 +18,8 @@ class CustomJWTAuthentication(JWTAuthentication):
 
     def get_user(self, validated_token):
         try:
-            user_id = validated_token["user_id"]
+            # 跟簽發端（RefreshToken.for_user）與續命端用同一個設定，目前是 'id'
+            user_id = validated_token[api_settings.USER_ID_CLAIM]
         except KeyError:
             raise InvalidToken("Token contained no recognizable user identification")
 

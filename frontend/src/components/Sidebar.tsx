@@ -6,6 +6,7 @@ import '../styles/Sidebar.css';
 
 // 側邊欄歌謠祭項目 → 頁面
 const SONGFEST_PATH: Record<string, string> = {
+  '歌謠祭首頁': '/songfest',
   '舊曲清單': '/songfest/library',
   '新曲投稿': '/songfest/submit',
   '亂入投稿說明/投票': '/songfest/guest',
@@ -55,6 +56,7 @@ const menuOptions: Option[] = [
   {
     name: '歌謠祭平台',
     children: [
+      { name: '歌謠祭首頁', requirement: 'public' },
       { name: '舊曲清單', requirement: 'public' },
       { name: '新曲投稿', requirement: 'public' },
       { name: '亂入投稿說明/投票', requirement: 'public' },
@@ -66,6 +68,7 @@ const menuOptions: Option[] = [
   {
     name: '社課介紹',
     children: [
+      { name: '社課總覽', requirement: 'public' },
       { name: '動畫播放組', requirement: 'public' },
       { name: 'MV剪輯組', requirement: 'public' },
       { name: '繪畫組', requirement: 'public' },
@@ -82,8 +85,8 @@ const menuOptions: Option[] = [
   {
     name: '活動資訊',
     children: [
-      { name: '行事曆', requirement: 'public' },
       { name: '活動公告一覽', requirement: 'public' },
+      { name: '行事曆', requirement: 'public' },
       { name: '相簿', requirement: 'member' },
       { name: '活動簽到', requirement: 'checkinManager' }
     ]
@@ -135,16 +138,6 @@ const menuOptions: Option[] = [
         window.location.href = '/';
         break;
         */
-      case '歌謠祭平台':
-        navigate('/songfest');
-        break;
-      case '社課介紹':
-        navigate('/club');
-        break;
-      case '活動資訊':
-        navigate('/announcement');
-        break;
-        
       case '登入':
         navigate('/login');
         break;
@@ -164,6 +157,8 @@ const menuOptions: Option[] = [
       navigate(`/club/works?category=${category}`);
     } else if (parent === '歌謠祭平台') {
       navigate(SONGFEST_PATH[item] ?? '/songfest');
+    } else if (item === '社課總覽') {
+      navigate('/club');
     } else if (item === '社課公告') {
       navigate('/club/lessons');
     } else if (item === '管理社課公告') {
@@ -239,7 +234,8 @@ const menuOptions: Option[] = [
                         {menuOptions.map((option) => (
                           <div key={option.name} className="menu-item-wrapper">
                             <motion.button
-                              onClick={() => handleClick(option.name)}
+                              // 有子選單的按鈕：點整張卡片就展開子選單（原本直接連到的頁面放在子選單第一項）
+                              onClick={(event) => (option.children?.length ? handleArrowClick(option.name, event) : handleClick(option.name))}
                               whileHover={{ scale: 1.05, backgroundColor: '#f0f8ff' }}
                               whileTap={{ scale: 0.95 }}
                               className="option-buttons"

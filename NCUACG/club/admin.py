@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.db.models import Count
 
 from .lessons import discord_text
-from .models import Comment, Course, CourseLead, Lesson, Work
+from .models import Comment, Course, CourseLead, Lesson, Photo, Work
 
 
 @admin.register(Course)
@@ -32,7 +32,7 @@ class WorkAdmin(admin.ModelAdmin):
     readonly_fields = ("views", "created_at")
     inlines = [CommentInline]
     fieldsets = (
-        (None, {"fields": ("course", "title", "author", "media_type", "is_published")}),
+        (None, {"fields": ("course", "title", "author", "media_type", "lesson", "is_published")}),
         ("媒體（上傳檔案或填外部網址，擇一）", {"fields": ("media_file", "external_url", "thumbnail")}),
         ("統計", {"fields": ("views", "created_at")}),
     )
@@ -86,3 +86,30 @@ class LessonAdmin(admin.ModelAdmin):
         from django.utils.html import format_html
 
         return format_html('<pre style="white-space:pre-wrap">{}</pre>', discord_text(obj)) if obj.pk else "-"
+
+
+@admin.register(Photo)
+class PhotoAdmin(admin.ModelAdmin):
+    """照片請負責人在網站上傳（會自動縮小、去掉 GPS）；後台只用來查看與刪除。"""
+
+    list_display = ("preview", "group", "taken_on", "lesson", "caption", "uploaded_by")
+    list_filter = ("kind", "category", "festival")
+    search_fields = ("caption", "topic")
+    date_hierarchy = "taken_on"
+    fields = ("preview", "kind", "category", "lesson", "festival", "topic", "taken_on", "caption", "uploaded_by", "created_at")
+    readonly_fields = ("preview", "uploaded_by", "created_at")
+
+    def has_add_permission(self, request):
+        return False
+
+    @admin.display(description="歸屬")
+    def group(self, obj):
+        return obj.group_label
+
+    @admin.display(description="照片")
+    def preview(self, obj):
+        from django.utils.html import format_html
+
+        from .photo_views import file_url
+
+        return format_html('<img src="{}" style="height:80px">', file_url(obj, thumb=True)) if obj.pk else "-"

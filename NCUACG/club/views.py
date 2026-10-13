@@ -3,7 +3,8 @@
 成果牆 API（掛在 /api/club/ 之下）
 
   GET    courses/?category=seiyuu                    社課列表（含已上架作品數）
-  GET    works/?course=<slug>&sort=time|popularity&order=desc|asc   course 必填
+  GET    works/?course=<slug>&sort=time|popularity&order=desc|asc   course 與 lesson 擇一必填
+  GET    works/?lesson=<id>                          某一堂社課的成果
   POST   works/<id>/view/                            瀏覽數 +1（同一人同一件作品有冷卻時間）
   POST   works/<id>/like/     DELETE works/<id>/like/        按讚 / 收回（需登入）
   GET    works/<id>/comments/                        留言列表
@@ -14,6 +15,8 @@
 輸出欄位刻意對齊 frontend/src/pages/Works.tsx 的 Work / Comment 型別（camelCase）。
 """
 from __future__ import annotations
+
+import re
 
 from django.db import IntegrityError
 from django.db.models import Count, Exists, F, OuterRef, Q
@@ -67,7 +70,20 @@ def _comment_to_dict(c: Comment, user=None) -> dict:
     }
 
 
+_YOUTUBE = re.compile(r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|embed/|shorts/|live/)|youtu\.be/)([\w-]{11})")
+
+
+def youtube_id(url: str) -> str | None:
+    match = _YOUTUBE.search(url or "")
+    return match.group(1) if match else None
+
+
 def _work_to_dict(w: Work) -> dict:
+    video_id = None if w.media_file else youtube_id(w.external_url)
+    lesson = w.lesson
+    thumbnail = w.thumbnail.url if w.thumbnail else None
+    if thumbnail is None and video_id:
+        thumbnail = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
     return {
         "id": w.id,
         "course": w.course.slug,
@@ -75,7 +91,10 @@ def _work_to_dict(w: Work) -> dict:
         "author": w.author,
         "type": w.media_type,
         "url": w.media_url,
-        "thumbnail": w.thumbnail.url if w.thumbnail else None,
+        "thumbnail": thumbnail,
+        # YouTube 連結不能用 <video> 播，前端改用內嵌播放器
+        "embedUrl": f"https://www.youtube-nocookie.com/embed/{video_id}" if video_id else None,
+        "lesson": {"id": lesson.id, "number": lesson.number, "title": lesson.title} if lesson else None,
         "likes": getattr(w, "like_count", 0),
         "views": w.views,
         "isLiked": bool(getattr(w, "is_liked", False)),
@@ -89,7 +108,7 @@ def _works_queryset(user):
     """帶好按讚數、留言數、是否已按讚的查詢，避免 N+1。"""
     works = (
         Work.objects.filter(is_published=True)
-        .select_related("course")
+        .select_related("course", "lesson")
         .annotate(
             like_count=Count("likes", distinct=True),
             comment_count=Count("comments", distinct=True),
@@ -149,11 +168,16 @@ def work_list(request):
     sort=time（預設）依上架時間；sort=popularity 依按讚數，同分再比瀏覽數。
     order=desc（預設）/ asc。
     """
-    # 一定要指定社課：不帶的話等於把整站作品一次倒出來
+    # 一定要指定社課或某一堂：不帶的話等於把整站作品一次倒出來
     course = request.GET.get("course")
-    if not course:
+    lesson = request.GET.get("lesson")
+    qs = _works_queryset(_current_user(request))
+    if course:
+        qs = qs.filter(course__slug=course)
+    elif lesson and lesson.isdigit():
+        qs = qs.filter(lesson_id=int(lesson))
+    else:
         return Response({"course": ["必須指定社課"]}, status=status.HTTP_400_BAD_REQUEST)
-    qs = _works_queryset(_current_user(request)).filter(course__slug=course)
 
     sort = request.GET.get("sort", "time")
     desc = request.GET.get("order", "desc") != "asc"

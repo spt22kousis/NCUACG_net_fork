@@ -1,7 +1,8 @@
 ﻿import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { fetchLessons, formatLessonTime, lessonLabel, type Lesson } from '../api/club';
+import { fetchLessons, fetchPhotos, formatLessonTime, lessonLabel, type Lesson, type Photo } from '../api/club';
+import { useAuth } from '../contexts/auth';
 import '../styles/Introduction.css';
 
 // 定義新的 props 介面
@@ -21,6 +22,18 @@ const Introduction: React.FC<IntroductionProps> = ({ content, onClose }) => {
   const navigate = useNavigate();
   // 這個社課的下一堂（還沒結束的第一堂）；undefined 是載入中，null 是沒有排定
   const [next, setNext] = useState<Lesson | null | undefined>(undefined);
+  // 最近的社課照片，只有登入的社員看得到
+  const { isAuthenticated } = useAuth();
+  const [photos, setPhotos] = useState<Photo[]>([]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let cancelled = false;
+    fetchPhotos({ kind: 'lesson', category: content.url, limit: 6 })
+      .then(res => { if (!cancelled) setPhotos(res.photos); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isAuthenticated, content.url]);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,6 +87,17 @@ const Introduction: React.FC<IntroductionProps> = ({ content, onClose }) => {
             )}
             <Link to={`/club/lessons?category=${content.url}`} className="modal-all-lessons">所有堂次 →</Link>
           </div>
+
+          {photos.length > 0 && (
+            <div className="modal-photos">
+              {photos.map(p => (
+                <Link key={p.id} to={`/photos?kind=lesson&category=${content.url}`}>
+                  <img src={p.thumbUrl} alt={p.caption || p.groupLabel} loading="lazy" />
+                </Link>
+              ))}
+              <Link to={`/photos?kind=lesson&category=${content.url}`} className="modal-all-lessons">更多照片 →</Link>
+            </div>
+          )}
           
           <div className="modal-footer">
             <button onClick={onClose} aria-label="關閉">

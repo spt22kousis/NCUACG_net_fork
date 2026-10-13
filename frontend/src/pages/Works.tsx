@@ -1,5 +1,5 @@
 ﻿import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronUp,
   ChevronDown,
@@ -39,6 +39,8 @@ interface Work {
   type: 'video' | 'image';
   url: string;
   thumbnail: string | null;
+  embedUrl: string | null; // YouTube 連結：用內嵌播放器，不能用 <video>
+  lesson: { id: number; number: number | null; title: string } | null; // 來自哪一堂社課
   likes: number;
   views: number;
   commentCount: number; // 留言本體在開啟留言欄時另外抓
@@ -475,6 +477,11 @@ const Works: React.FC = () => {
                   by {selectedWork.author}
                 </div>
               )}
+              {selectedWork.lesson && (
+                <Link to={`/club/lessons/${selectedWork.lesson.id}`} className="author-tag lesson-tag">
+                  來自 {selectedWork.lesson.number ? `第 ${selectedWork.lesson.number} 堂：` : ''}{selectedWork.lesson.title}
+                </Link>
+              )}
               <div className="title-container">
                 <div className={`title ${selectedWork.title.length > 20 ? 'title-marquee' : ''}`}>
                   {selectedWork.title}
@@ -516,7 +523,17 @@ const Works: React.FC = () => {
             <div className="media-container">
               {!isGridView ? (
                 <div className="media-viewer">
-                  {selectedWork.type === 'video' ? (
+                  {selectedWork.embedUrl ? (
+                    <div className="video-container">
+                      <iframe
+                        className="video-embed"
+                        src={selectedWork.embedUrl}
+                        title={selectedWork.title}
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : selectedWork.type === 'video' ? (
                     <div className="video-container">
                       {/* 視頻播放器 */}
                       <div className="video-player">

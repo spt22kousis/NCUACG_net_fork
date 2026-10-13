@@ -1,7 +1,12 @@
 # NCUACG/club/models.py
+import os
+
 from django.conf import settings
+from django.core.files.storage import FileSystemStorage
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 
 class Course(models.Model):
@@ -64,6 +69,15 @@ class Work(models.Model):
     views = models.PositiveIntegerField(default=0)
     is_published = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    # 選填：這件作品是哪一堂社課的成果
+    lesson = models.ForeignKey(
+        "Lesson", on_delete=models.SET_NULL, null=True, blank=True, related_name="works", verbose_name="來自哪一堂社課",
+    )
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="works_uploaded", verbose_name="上架者",
+    )
 
     class Meta:
         ordering = ["-created_at"]
@@ -185,3 +199,107 @@ class Lesson(models.Model):
     def clean(self):
         if self.end_time and self.end_time < self.start_time:
             raise ValidationError({"end_time": "結束時間不能早於開始時間。"})
+
+
+# ── 社課照片 ────────────────────────────────────────────────────────────────
+
+class PrivateStorage(FileSystemStorage):
+    """存在不公開的 PRIVATE_MEDIA_ROOT。每次都重讀設定，測試改 settings 才會生效。"""
+
+    @property
+    def base_location(self):
+        return settings.PRIVATE_MEDIA_ROOT
+
+    @property
+    def location(self):
+        return os.path.abspath(self.base_location)
+
+    @property
+    def base_url(self):
+        return None  # 沒有公開網址，一律走 photo_views.photo_file
+
+
+def private_storage():
+    """社課照片只給登入社員看，由 photo_views 檢查簽章後才給。"""
+    return PrivateStorage()
+
+
+def photo_upload_to(instance, filename):
+    # 檔名在 images.py 處理時就決定好了（社課/隨機碼.jpg），這裡只加上資料夾
+    return f"photos/{filename}"
+
+
+class Photo(models.Model):
+    """
+    社團照片，三種歸屬：
+      - 社課：一定有社課種類，某一堂選填；該社課的負責人上傳
+      - 歌謠祭：某一場；該場的排歌組上傳
+      - 日常：社遊、聚餐、社博之類，分類名稱自由填；幹部上傳
+    幹部什麼都能傳。照片只給登入的社員看。
+    """
+
+    KIND_CHOICES = [
+        ("lesson", "社課"),
+        ("songfest", "歌謠祭"),
+        ("daily", "日常"),
+    ]
+
+    kind = models.CharField("歸屬", max_length=10, choices=KIND_CHOICES, default="lesson", db_index=True)
+    category = models.CharField("社課", max_length=20, choices=Course.CATEGORY_CHOICES, blank=True, db_index=True)
+    lesson = models.ForeignKey(
+        Lesson, on_delete=models.SET_NULL, null=True, blank=True, related_name="photos", verbose_name="哪一堂（選填）",
+    )
+    # 刪歌謠祭場次前要先處理照片，避免照片跟著消失
+    festival = models.ForeignKey(
+        "songfest.Festival", on_delete=models.PROTECT, null=True, blank=True, related_name="photos",
+        verbose_name="歌謠祭場次",
+    )
+    topic = models.CharField("日常分類", max_length=50, blank=True, db_index=True, help_text="例如 社遊、聚餐、社博")
+    image = models.FileField("照片", storage=private_storage, upload_to=photo_upload_to)
+    thumbnail = models.FileField("縮圖", storage=private_storage, upload_to=photo_upload_to)
+    width = models.PositiveIntegerField(default=0)
+    height = models.PositiveIntegerField(default=0)
+    caption = models.CharField("說明", max_length=200, blank=True)
+    taken_on = models.DateField("拍攝日期", db_index=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="photos_uploaded", verbose_name="上傳者",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-taken_on", "-id"]
+        indexes = [models.Index(fields=["category", "taken_on"])]
+        verbose_name = "照片"
+        verbose_name_plural = "照片"
+
+    def __str__(self) -> str:
+        return f"[{self.group_label}] {self.taken_on} {self.caption}"
+
+    @property
+    def group_label(self) -> str:
+        """顯示用的歸屬，例如「鐵道社課」「歌謠祭 115上期末」「社遊」。"""
+        if self.kind == "lesson":
+            return f"{self.get_category_display()}社課"
+        if self.kind == "songfest":
+            return f"歌謠祭 {self.festival.name}" if self.festival_id else "歌謠祭"
+        return self.topic or "日常"
+
+    def clean(self):
+        if self.kind == "lesson":
+            if not self.category:
+                raise ValidationError({"category": "請選社課。"})
+            if self.lesson_id and self.lesson.category != self.category:
+                raise ValidationError({"lesson": "只能選同一個社課的堂次。"})
+        elif self.kind == "songfest" and not self.festival_id:
+            raise ValidationError({"festival": "請選歌謠祭場次。"})
+        elif self.kind == "daily" and not self.topic.strip():
+            raise ValidationError({"topic": "請填分類，例如社遊。"})
+
+
+@receiver(post_delete, sender=Photo)
+def _delete_photo_files(sender, instance, **kwargs):
+    """刪照片時連檔案一起刪，不然 private_media 只會越來越大。"""
+    for field in (instance.image, instance.thumbnail):
+        if field:
+            field.delete(save=False)

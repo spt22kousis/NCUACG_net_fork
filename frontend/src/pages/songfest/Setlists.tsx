@@ -83,6 +83,8 @@ export function SetlistDetail() {
               {formatDate(festival.date, true)}
               {festival.venue && ` · ${festival.venue}`}
               {festival.playCount > 0 && ` · ${festival.playCount} 首`}
+              {/* 相簿只有社員看得到，沒登入點進去會請他登入 */}
+              {' · '}<Link to={`/photos?kind=songfest&festival=${festival.id}`}>活動照片</Link>
             </p>
           </div>
           {festival.playCount === 0 && festival.sessions.length > 0 && (

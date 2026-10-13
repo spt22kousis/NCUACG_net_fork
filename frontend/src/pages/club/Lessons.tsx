@@ -7,6 +7,7 @@ import {
 } from '../../api/club';
 import ClubLayout from './ClubLayout';
 import LessonCard, { CopyDiscordButton } from './LessonCard';
+import LessonExtras from './LessonExtras';
 
 function isOver(lesson: Lesson): boolean {
   return new Date(lesson.endTime ?? lesson.startTime).getTime() < Date.now();
@@ -113,6 +114,7 @@ export function LessonDetail() {
               <Link to={`/club/lessons/manage?edit=${lesson.id}`} className="sf-button">修改</Link>
             </div>
           )}
+          <LessonExtras lesson={lesson} />
         </>
       )}
     </ClubLayout>

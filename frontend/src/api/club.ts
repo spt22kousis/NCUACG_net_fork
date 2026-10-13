@@ -151,3 +151,203 @@ export function fromLocalInput(value: string): string | null {
 export function isoDay(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+
+// ── 照片（對應後端 NCUACG/club/photo_views.py）──────────────────────────────
+
+export type PhotoKind = 'lesson' | 'songfest' | 'daily';
+
+export const PHOTO_KIND_LABEL: Record<PhotoKind, string> = { lesson: '社課', songfest: '歌謠祭', daily: '日常' };
+
+export interface Photo {
+  id: number;
+  kind: PhotoKind;
+  category: string;
+  lesson: { id: number; number: number | null; title: string } | null;
+  festival: { id: number; name: string } | null;
+  topic: string;
+  groupLabel: string;   // 鐵道社課、歌謠祭 115上期末、社遊
+  caption: string;
+  takenOn: string;      // YYYY-MM-DD
+  width: number;
+  height: number;
+  url: string;          // 帶簽章的網址，當天與隔天有效
+  thumbUrl: string;
+  canEdit: boolean;
+}
+
+export interface PhotoUploadOptions {
+  categories: { id: string; name: string }[];        // 我負責的社課
+  festivals: { id: number; name: string; date: string }[]; // 我是排歌組的場次（幹部是全部）
+  daily: boolean;                                   // 可以傳日常照片（幹部）
+  topics: string[];                                 // 用過的日常分類
+}
+
+export interface PhotoPage {
+  photos: Photo[];
+  total: number;
+  hasMore: boolean;
+  topics: string[];
+  upload: PhotoUploadOptions | null; // 什麼都不能傳就是 null
+}
+
+export interface PhotoFilter {
+  kind?: PhotoKind | '';
+  category?: string;
+  lesson?: number;
+  festival?: number;
+  topic?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PhotoInput {
+  kind?: PhotoKind;
+  category?: string;
+  lesson?: number | null;
+  festival?: number | null;
+  topic?: string;
+  takenOn?: string;
+  caption?: string;
+}
+
+export async function fetchPhotos(filter: PhotoFilter = {}): Promise<PhotoPage> {
+  const params = Object.fromEntries(Object.entries(filter).filter(([, v]) => v !== undefined && v !== ''));
+  return (await api.get<PhotoPage>('/club/photos/', { params })).data;
+}
+
+/** 一次傳一張，才能顯示進度、也不會碰到伺服器單次上傳的大小限制 */
+export async function uploadPhoto(image: Blob, input: PhotoInput, onProgress?: (ratio: number) => void): Promise<Photo> {
+  const form = new FormData();
+  form.append('image', image, 'photo.jpg');
+  for (const [key, value] of Object.entries(input)) {
+    if (value !== undefined && value !== null && value !== '') form.append(key, String(value));
+  }
+  const res = await api.post<Photo>('/club/photos/', form, {
+    onUploadProgress: e => { if (onProgress && e.total) onProgress(e.loaded / e.total); },
+  });
+  return res.data;
+}
+
+export async function updatePhoto(id: number, input: PhotoInput): Promise<Photo> {
+  return (await api.patch<Photo>(`/club/photos/${id}/`, input)).data;
+}
+
+export async function deletePhoto(id: number): Promise<void> {
+  await api.delete(`/club/photos/${id}/`);
+}
+
+/**
+ * 上傳前先在瀏覽器把照片縮到長邊 maxSide，手機拍的 5MB 照片會變成幾百 KB。
+ * 讀不了的格式（例如部分 HEIC）就原檔上傳，交給後端判斷。
+ */
+export async function resizeImage(file: File, maxSide = 1920): Promise<Blob> {
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+    ctx.fillStyle = '#FFFFFF'; // 透明 PNG 鋪白底
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.88));
+    return blob ?? file;
+  } catch {
+    return file;
+  }
+}
+
+// ── 成果牆上架（對應後端 NCUACG/club/work_manage_views.py）──────────────────
+
+export interface ManagedWork {
+  id: number;
+  course: string;          // 成果牆分類的 slug
+  category: string;
+  title: string;
+  author: string;
+  type: 'video' | 'image';
+  url: string;
+  thumbnail: string | null;
+  embedUrl: string | null; // YouTube
+  lesson: { id: number; number: number | null; title: string } | null;
+  isPublished: boolean;
+  externalUrl: string;
+  hasFile: boolean;
+  likes: number;
+  views: number;
+  commentCount: number;
+  createdAt: string;
+}
+
+export interface WorkCourse {
+  id: string;   // slug
+  name: string;
+  color: 'blue' | 'green';
+  category: string;
+  workCount: number;
+}
+
+export interface WorkManageData {
+  categories: { id: string; name: string }[];
+  courses: WorkCourse[];
+  works: ManagedWork[];
+  lessons: { id: number; category: string; number: number | null; title: string; startTime: string }[];
+  maxVideoMb: number;
+}
+
+export interface WorkInput {
+  course?: string;
+  title?: string;
+  author?: string;
+  type?: 'video' | 'image';
+  externalUrl?: string;
+  lesson?: number | '';   // 空字串 = 不連結
+  isPublished?: boolean;
+  file?: Blob | File;
+  thumbnail?: Blob | File;
+}
+
+function workForm(input: WorkInput): FormData {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined) continue;
+    if (value instanceof Blob) {
+      form.append(key, value, value instanceof File ? value.name : `${key}.jpg`);
+    } else {
+      form.append(key, String(value));
+    }
+  }
+  return form;
+}
+
+export async function fetchWorkManage(): Promise<WorkManageData> {
+  return (await api.get<WorkManageData>('/club/works/manage/')).data;
+}
+
+export async function createWork(input: WorkInput, onProgress?: (ratio: number) => void): Promise<ManagedWork> {
+  return (await api.post<ManagedWork>('/club/works/manage/', workForm(input), {
+    onUploadProgress: e => { if (onProgress && e.total) onProgress(e.loaded / e.total); },
+  })).data;
+}
+
+export async function updateWork(id: number, input: WorkInput, onProgress?: (ratio: number) => void): Promise<ManagedWork> {
+  return (await api.patch<ManagedWork>(`/club/works/manage/${id}/`, workForm(input), {
+    onUploadProgress: e => { if (onProgress && e.total) onProgress(e.loaded / e.total); },
+  })).data;
+}
+
+export async function deleteWork(id: number): Promise<void> {
+  await api.delete(`/club/works/manage/${id}/`);
+}
+
+export async function createWorkCourse(category: string, name: string): Promise<WorkCourse> {
+  return (await api.post<WorkCourse>('/club/courses/manage/', { category, name })).data;
+}
+
+/** 某一堂社課的成果（公開） */
+export async function fetchLessonWorks(lessonId: number): Promise<ManagedWork[]> {
+  return (await api.get<ManagedWork[]>('/club/works/', { params: { lesson: lessonId } })).data;
+}

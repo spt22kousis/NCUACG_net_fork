@@ -74,14 +74,16 @@ const menuOptions: Option[] = [
       { name: '模型製作組', requirement: 'public' },
       { name: '鐵道組', requirement: 'public' },
       { name: '社課公告', requirement: 'public' },
-      { name: '管理社課公告', requirement: 'courseLead' }
+      { name: '管理社課公告', requirement: 'courseLead' },
+      { name: '管理成果牆', requirement: 'courseLead' }
     ]
   },
   {
     name: '活動資訊',
     children: [
       { name: '行事曆', requirement: 'public' },
-      { name: '活動公告一覽', requirement: 'public' }
+      { name: '活動公告一覽', requirement: 'public' },
+      { name: '相簿', requirement: 'member' }
     ]
   }
 ];
@@ -164,6 +166,10 @@ const menuOptions: Option[] = [
       navigate('/club/lessons');
     } else if (item === '管理社課公告') {
       navigate('/club/lessons/manage');
+    } else if (item === '管理成果牆') {
+      navigate('/club/works/manage');
+    } else if (item === '相簿') {
+      navigate('/photos');
     } else if (item === '行事曆') {
       navigate('/calendar');
     } else if (item === '活動公告一覽') {

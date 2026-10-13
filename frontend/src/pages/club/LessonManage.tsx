@@ -76,6 +76,12 @@ export default function LessonManage() {
           <button type="button" className="sf-button" onClick={() => { setCreating(false); setEditing(lesson.id); }}>
             修改{new Date(lesson.startTime).getTime() < now && !lesson.slidesUrl ? '／補簡報' : ''}
           </button>
+          <Link
+            className="sf-button"
+            to={`/photos?kind=lesson&category=${lesson.category}&lesson=${lesson.id}&upload=1`}
+          >
+            上傳照片
+          </Link>
           <button type="button" className="sf-button is-danger" onClick={() => void remove(lesson)}>刪除</button>
         </div>
       </div>

@@ -10,13 +10,20 @@ import '../../styles/Lessons.css';
 const TABS = [
   { to: '/club/lessons', label: '社課公告', end: true },
   { to: '/calendar', label: '行事曆', end: true },
+  { to: '/photos', label: '相簿', end: true },
+];
+
+// 社課負責人與幹部才看得到
+const LEAD_TABS = [
+  { to: '/club/lessons/manage', label: '管理社課公告', end: true },
+  { to: '/club/works/manage', label: '管理成果牆', end: true },
 ];
 
 export default function ClubLayout({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   // 社課負責人不一定是幹部，後端 /api/me/ 會另外告訴我們
   const canManage = Boolean(user?.courseLead) || user?.role === 'admin' || user?.role === 'superadmin';
-  const tabs = canManage ? [...TABS, { to: '/club/lessons/manage', label: '管理社課公告', end: true }] : TABS;
+  const tabs = canManage ? [...TABS, ...LEAD_TABS] : TABS;
   return (
     <div className="songfest-page">
       <Sidebar />

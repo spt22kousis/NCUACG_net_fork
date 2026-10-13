@@ -116,3 +116,21 @@
   margin-left: auto;
   color: #0062cc;
 }
+
+/* 社課介紹彈窗裡最近的社課照片（登入才有） */
+.modal-photos {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.modal-photos img {
+  display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border: 2px solid #000;
+  border-radius: 8px;
+}

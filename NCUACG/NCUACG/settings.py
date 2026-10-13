@@ -177,6 +177,13 @@ STATIC_URL = 'static/'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# 只給登入社員看的檔案（社課照片）。不能交給 nginx 直接公開，一律經過 Django 檢查簽章後才給。
+# private_media/ 已在 .gitignore。
+PRIVATE_MEDIA_ROOT = BASE_DIR / 'private_media'
+
+# 社課負責人在網站上傳成果牆影片的大小上限（MB）；正式站的 nginx client_max_body_size 也要跟著調
+CLUB_MAX_VIDEO_MB = 300
+
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

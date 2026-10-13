@@ -702,3 +702,22 @@
     max-height: 300px;
   }
 }
+/* YouTube 作品用內嵌播放器 */
+.video-embed {
+  flex: 1;
+  width: 100%;
+  min-height: 240px;
+  border: 0;
+  background-color: #000000;
+}
+
+/* 來自哪一堂社課 */
+.lesson-tag {
+  background-color: #16a34a;
+  text-decoration: none;
+}
+
+.lesson-tag:hover {
+  color: #ffffff;
+  filter: brightness(0.92);
+}

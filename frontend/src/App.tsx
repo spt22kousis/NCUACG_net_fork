@@ -15,6 +15,9 @@ import { SetlistDetail, SetlistIndex } from './pages/songfest/Setlists';
 import Submit from './pages/songfest/Submit';
 import Guest from './pages/songfest/Guest';
 import Manage from './pages/songfest/Manage';
+import Lessons, { LessonDetail } from './pages/club/Lessons';
+import LessonManage from './pages/club/LessonManage';
+import Calendar from './pages/club/Calendar';
 // 共用 Context
 import { AuthProvider } from './contexts/AuthContext';
 import { ChatProvider } from './contexts/ChatContext';
@@ -46,6 +49,10 @@ export default function App() {
               <Route path="/announcement" element={<Announcement />} />
               <Route path="/club" element={< Club/>} />
               <Route path="/club/works" element={<Works/>}/>
+              <Route path="/club/lessons" element={<Lessons />} />
+              <Route path="/club/lessons/manage" element={<LessonManage />} />
+              <Route path="/club/lessons/:id" element={<LessonDetail />} />
+              <Route path="/calendar" element={<Calendar />} />
               {/* --- AI 助理聊天頁 --- */}
               <Route path="/assistant" element={<AssistantChat />} />
               {/* 歌謠祭 */}
@@ -58,7 +65,6 @@ export default function App() {
               <Route path="/songfest/manage" element={<Manage />} />
               {/* 已放進導覽列、尚未完成的功能 */}
               <Route path="/songfest/requests" element={<ComingSoon feature="點歌系統" />} />
-              <Route path="/calendar" element={<ComingSoon feature="行事曆" />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>

@@ -120,3 +120,68 @@ class CommentLike(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["comment", "user"], name="unique_comment_like"),
         ]
+
+
+# ── 社課堂次與公告 ───────────────────────────────────────────────────────────
+
+class CourseLead(models.Model):
+    """社課負責人：每個社課種類固定指定幾個人（不一定是幹部），只能發、改自己社課的公告。"""
+
+    category = models.CharField("社課", max_length=20, choices=Course.CATEGORY_CHOICES, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="course_leads", verbose_name="負責人"
+    )
+
+    class Meta:
+        ordering = ["category", "id"]
+        constraints = [
+            models.UniqueConstraint(fields=["category", "user"], name="unique_course_lead"),
+        ]
+        verbose_name = "社課負責人"
+        verbose_name_plural = "社課負責人"
+
+    def __str__(self) -> str:
+        return f"{self.get_category_display()}：{self.user.name}"
+
+
+class Lesson(models.Model):
+    """
+    一堂社課。同一份資料用在 Discord 公告、社課介紹頁、首頁公告欄與行事曆。
+    課後負責人可以補上簡報連結，學期末就是一份社課紀錄。
+    """
+
+    category = models.CharField("社課", max_length=20, choices=Course.CATEGORY_CHOICES, db_index=True)
+    number = models.PositiveIntegerField("第幾堂", null=True, blank=True)
+    title = models.CharField("主題", max_length=100, help_text="Discord 公告的「內容：」那一行，例如「高鐵與捷運」")
+    start_time = models.DateTimeField("開始時間", db_index=True)
+    end_time = models.DateTimeField("結束時間", null=True, blank=True)
+    location = models.CharField("地點", max_length=100, default="社辦")
+    content = models.TextField("內容介紹", blank=True)
+    notes = models.TextField("備註", blank=True, help_text="公告分隔線下面的話，例如「負責人在準備段考……」")
+    prerequisites = models.TextField("建議具備", blank=True, help_text="一行一項")
+    requires = models.ManyToManyField(
+        "self", symmetrical=False, blank=True, related_name="required_by", verbose_name="建議先參加的堂次"
+    )
+    discord_role = models.CharField("Discord 身分組", max_length=50, blank=True, help_text="例如 @鐵道社課通知")
+    slides_url = models.URLField("簡報連結", blank=True)
+    is_published = models.BooleanField("公開", default=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="lessons_created", verbose_name="建立者",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["start_time", "id"]
+        indexes = [models.Index(fields=["is_published", "start_time"])]
+        verbose_name = "社課堂次"
+        verbose_name_plural = "社課堂次"
+
+    def __str__(self) -> str:
+        return f"[{self.get_category_display()}] {self.title}"
+
+    def clean(self):
+        if self.end_time and self.end_time < self.start_time:
+            raise ValidationError({"end_time": "結束時間不能早於開始時間。"})

@@ -1,6 +1,7 @@
-﻿import React from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { fetchLessons, formatLessonTime, lessonLabel, type Lesson } from '../api/club';
 import '../styles/Introduction.css';
 
 // 定義新的 props 介面
@@ -18,6 +19,21 @@ interface IntroductionProps {
 
 const Introduction: React.FC<IntroductionProps> = ({ content, onClose }) => {
   const navigate = useNavigate();
+  // 這個社課的下一堂（還沒結束的第一堂）；undefined 是載入中，null 是沒有排定
+  const [next, setNext] = useState<Lesson | null | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchLessons(content.url)
+      .then(list => {
+        const now = Date.now();
+        const upcoming = list.find(l => new Date(l.endTime ?? l.startTime).getTime() >= now);
+        if (!cancelled) setNext(upcoming ?? null);
+      })
+      .catch(() => { if (!cancelled) setNext(null); });
+    return () => { cancelled = true; };
+  }, [content.url]);
+
   return (
     <AnimatePresence>
       <motion.div
@@ -45,6 +61,18 @@ const Introduction: React.FC<IntroductionProps> = ({ content, onClose }) => {
                 {line}
               </div>
             ))}
+          </div>
+
+          <div className="modal-next-lesson">
+            <strong>下一堂</strong>
+            {next === undefined && <span>載入中…</span>}
+            {next === null && <span>還沒有排定</span>}
+            {next && (
+              <Link to={`/club/lessons/${next.id}`}>
+                {formatLessonTime(next)}｜{next.location}｜{lessonLabel(next)}
+              </Link>
+            )}
+            <Link to={`/club/lessons?category=${content.url}`} className="modal-all-lessons">所有堂次 →</Link>
           </div>
           
           <div className="modal-footer">

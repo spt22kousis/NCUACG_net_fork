@@ -1,0 +1,309 @@
+/* 社課公告與行事曆。外框、卡片、按鈕沿用 Songfest.css 的 sf-* */
+
+/* ── 社課卡片 ── */
+.lesson-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lesson-card {
+  padding: 16px 20px;
+}
+
+.lesson-card.is-draft {
+  border-style: dashed;
+}
+
+.lesson-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lesson-category {
+  padding: 2px 10px;
+  border: 2px solid #000000;
+  border-radius: 999px;
+  background-color: #DCFCE7;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.lesson-title {
+  margin: 8px 0 0;
+  font-size: 1.25rem;
+}
+
+.lesson-title a {
+  color: #000000;
+}
+
+.lesson-title a:hover {
+  color: #007bff;
+}
+
+.lesson-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 24px;
+  margin: 8px 0 0;
+}
+
+.lesson-meta dt {
+  display: inline;
+  margin-right: 6px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.lesson-meta dd {
+  display: inline;
+  margin: 0;
+  font-weight: 600;
+}
+
+.lesson-content,
+.lesson-notes {
+  margin: 10px 0 0;
+  white-space: pre-wrap;
+}
+
+.lesson-content.is-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.lesson-notes {
+  padding-top: 10px;
+  border-top: 2px dashed #e5e7eb;
+  color: #4b5563;
+}
+
+.lesson-prereq {
+  margin-top: 10px;
+}
+
+.lesson-prereq ul {
+  margin: 4px 0 0;
+  padding-left: 1.4em;
+}
+
+.lesson-slides {
+  margin: 10px 0 0;
+  font-weight: 600;
+}
+
+.lesson-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.lesson-manage-row .lesson-actions {
+  margin-top: 8px;
+}
+
+.lesson-filter {
+  margin-top: 16px;
+}
+
+.lesson-span {
+  grid-column: 1 / -1;
+}
+
+.lesson-requires {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+/* ── 行事曆 ── */
+.calendar-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.calendar-month {
+  margin: 0 6px;
+  font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-legend {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  overflow: hidden;
+}
+
+.calendar-weekday {
+  padding: 6px;
+  border-bottom: 2px solid #000000;
+  background-color: #FFF8DB;
+  text-align: center;
+  font-weight: 700;
+}
+
+.calendar-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 96px;
+  padding: 4px;
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  min-width: 0;
+}
+
+.calendar-cell:nth-child(7n) {
+  border-right: none;
+}
+
+.calendar-cell.is-outside {
+  background-color: #FAFAF9;
+}
+
+.calendar-cell.is-outside .calendar-date {
+  color: #c4c4c4;
+}
+
+.calendar-date {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-cell.is-today .calendar-date {
+  align-self: flex-start;
+  padding: 0 6px;
+  border-radius: 999px;
+  background-color: #007bff;
+  color: #FFFFFF;
+}
+
+.calendar-item {
+  display: -webkit-box;
+  -webkit-line-clamp: 3; /* 格子窄時換行，最多 3 行 */
+  -webkit-box-orient: vertical;
+  padding: 1px 6px;
+  border-radius: 6px;
+  color: #1f2937;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.calendar-legend .calendar-item {
+  display: inline-block;
+}
+
+.calendar-item:hover {
+  color: #000000;
+  filter: brightness(0.95);
+}
+
+.calendar-item.is-event {
+  background-color: #DBEAFE;
+}
+
+.calendar-item.is-lesson {
+  background-color: #DCFCE7;
+}
+
+.calendar-item.is-songfest {
+  background-color: #FFD84D;
+  font-weight: 700;
+}
+
+.calendar-time {
+  margin-right: 4px;
+  font-variant-numeric: tabular-nums;
+  color: #4b5563;
+}
+
+/* 手機：月曆格子太擠，改成依日期的清單 */
+.calendar-list {
+  display: none;
+}
+
+.calendar-list-day {
+  padding: 12px 14px;
+}
+
+.calendar-list-day + .calendar-list-day {
+  margin-top: 12px;
+}
+
+.calendar-list-day.is-today {
+  border-color: #007bff;
+}
+
+.calendar-list-day h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.calendar-list-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.calendar-list-row .calendar-item {
+  font-size: 14px;
+}
+
+@media (max-width: 720px) {
+  .calendar-grid {
+    display: none;
+  }
+
+  .calendar-list {
+    display: block;
+  }
+
+  .calendar-legend {
+    margin-left: 0;
+  }
+}
+
+/* Discord 公告預覽：跟按鈕放在同一排，自己換到下一行 */
+.lesson-discord {
+  flex-basis: 100%;
+}
+
+.lesson-discord .sf-error {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.lesson-discord textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 2px solid #d1d5db;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  color: #1f2937;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Microsoft JhengHei", monospace;
+  font-size: 14px;
+  line-height: 1.5;
+}

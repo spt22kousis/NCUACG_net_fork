@@ -93,3 +93,26 @@
   font-size: 16px;
   color: #555;
 }
+/* 社課介紹彈窗裡的「下一堂」 */
+.modal-next-lesson {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin-top: 14px;
+  padding: 10px 14px;
+  border: 2px solid #000;
+  border-radius: 12px;
+  background-color: #DCFCE7;
+  font-size: 16px;
+}
+
+.modal-next-lesson a {
+  color: #000;
+  font-weight: 600;
+}
+
+.modal-next-lesson .modal-all-lessons {
+  margin-left: auto;
+  color: #0062cc;
+}

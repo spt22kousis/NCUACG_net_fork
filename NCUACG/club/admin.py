@@ -2,7 +2,8 @@
 from django.contrib import admin
 from django.db.models import Count
 
-from .models import Comment, Course, Work
+from .lessons import discord_text
+from .models import Comment, Course, CourseLead, Lesson, Work
 
 
 @admin.register(Course)
@@ -54,3 +55,34 @@ class CommentAdmin(admin.ModelAdmin):
     @admin.display(description="內容")
     def short_content(self, obj):
         return obj.content[:40]
+
+
+@admin.register(CourseLead)
+class CourseLeadAdmin(admin.ModelAdmin):
+    """每個社課固定指定幾位負責人，他們登入網站後可以發、改自己社課的公告。"""
+
+    list_display = ("category", "user")
+    list_filter = ("category",)
+    search_fields = ("user__name", "user__email")
+
+
+@admin.register(Lesson)
+class LessonAdmin(admin.ModelAdmin):
+    list_display = ("title", "category", "number", "start_time", "location", "is_published")
+    list_filter = ("category", "is_published")
+    search_fields = ("title", "content")
+    date_hierarchy = "start_time"
+    filter_horizontal = ("requires",)
+    readonly_fields = ("discord_preview", "created_by", "created_at", "updated_at")
+    fieldsets = (
+        (None, {"fields": ("category", "number", "title", "start_time", "end_time", "location", "is_published")}),
+        ("公告內容", {"fields": ("content", "notes", "prerequisites", "requires", "discord_role", "discord_preview")}),
+        ("課後", {"fields": ("slides_url",)}),
+        ("紀錄", {"fields": ("created_by", "created_at", "updated_at")}),
+    )
+
+    @admin.display(description="Discord 公告預覽")
+    def discord_preview(self, obj):
+        from django.utils.html import format_html
+
+        return format_html('<pre style="white-space:pre-wrap">{}</pre>', discord_text(obj)) if obj.pk else "-"

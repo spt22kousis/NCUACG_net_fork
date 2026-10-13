@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import fallbackNotices from '../data/notices.json'; // 失敗時備援
 import { api } from '../api/client';
+import { fetchUpcomingLessons, formatLessonTime, type Lesson } from '../api/club';
 import '../styles/NoticeBoard.css';
 
 const MAX_LINES = 6;
@@ -58,6 +59,18 @@ function mapApiEventsToUi(data: ApiEvent[]): UiNotice[] {
   }));
 }
 
+function mapLessonsToUi(data: Lesson[]): UiNotice[] {
+  // 社課跟活動放在同一個公告欄，內容照 Discord 公告的前幾行
+  return data.map((l) => ({
+    id: `lesson-${l.id}`,
+    title: `【${l.categoryName}社課】${l.title}`,
+    content: [`地點：${l.location}`, l.content].filter(Boolean).join('\n'),
+    date: formatLessonTime(l),
+    startISO: l.startTime,
+    endISO: l.endTime,
+  }));
+}
+
 function mapLocalNoticesToUi(data: LocalNotice[]): UiNotice[] {
   // 你原本的 notices.json：title / content / date(字串)
   return (data || []).map((n, idx) => ({
@@ -100,15 +113,18 @@ const NoticeBoard: React.FC = () => {
 
     async function load() {
       setLoading(true);
-      try {
-        const resp = await api.get<ApiEvent[]>('/event/upcoming/', { params: { days: 30 } });
-        const mapped = keepUpcoming(mapApiEventsToUi(resp.data));
-        if (!cancelled) setItems(mapped);
-      } catch {
-        const mapped = keepUpcoming(mapLocalNoticesToUi(fallbackNotices as LocalNotice[]));
-        if (!cancelled) setItems(mapped);
-      } finally {
-        if (!cancelled) setLoading(false);
+      // 活動與社課分開抓：社課失敗時照樣顯示活動；活動失敗才退回本地檔
+      const [events, lessons] = await Promise.allSettled([
+        api.get<ApiEvent[]>('/event/upcoming/', { params: { days: 30 } }),
+        fetchUpcomingLessons(30),
+      ]);
+      const mapped = events.status === 'fulfilled'
+        ? mapApiEventsToUi(events.value.data)
+        : mapLocalNoticesToUi(fallbackNotices as LocalNotice[]);
+      if (lessons.status === 'fulfilled') mapped.push(...mapLessonsToUi(lessons.value));
+      if (!cancelled) {
+        setItems(keepUpcoming(mapped));
+        setLoading(false);
       }
     }
     load();
@@ -155,7 +171,7 @@ const NoticeBoard: React.FC = () => {
     return (
       <div className="notice-board-container">
         <div className="notice-card-wrapper">
-          <div className="notice-card empty-state">目前 30 天內沒有活動</div>
+          <div className="notice-card empty-state">目前 30 天內沒有活動或社課</div>
         </div>
       </div>
     );

@@ -34,6 +34,8 @@ const Sidebar: React.FC = () => {
   const isMember = isAuthenticated;
   // 排歌組成員不一定是幹部
   const isSongfestStaff = isAdmin || Boolean(user?.songfestStaff);
+  // 社課負責人也不一定是幹部
+  const isCourseLead = isAdmin || Boolean(user?.courseLead);
   // 根據按鈕文字導航
   const navigate = useNavigate();
   const [activeMenu, setActive] = useState<string | null>(null);
@@ -41,7 +43,7 @@ const Sidebar: React.FC = () => {
 
 interface Requirement {
   name: string;
-  requirement?: 'public'|'member' | 'admin' | 'songfestStaff';
+  requirement?: 'public'|'member' | 'admin' | 'songfestStaff' | 'courseLead';
 }
 interface Option {
   name: string;
@@ -70,7 +72,9 @@ const menuOptions: Option[] = [
       { name: '聲優組', requirement: 'public' },
       { name: '御宅藝組', requirement: 'public' },
       { name: '模型製作組', requirement: 'public' },
-      { name: '鐵道組', requirement: 'public' }
+      { name: '鐵道組', requirement: 'public' },
+      { name: '社課公告', requirement: 'public' },
+      { name: '管理社課公告', requirement: 'courseLead' }
     ]
   },
   {
@@ -156,6 +160,10 @@ const menuOptions: Option[] = [
       navigate(`/club/works?category=${category}`);
     } else if (parent === '歌謠祭平台') {
       navigate(SONGFEST_PATH[item] ?? '/songfest');
+    } else if (item === '社課公告') {
+      navigate('/club/lessons');
+    } else if (item === '管理社課公告') {
+      navigate('/club/lessons/manage');
     } else if (item === '行事曆') {
       navigate('/calendar');
     } else if (item === '活動公告一覽') {
@@ -276,6 +284,7 @@ const menuOptions: Option[] = [
                               // 如果需要管理員權限且是管理員，就顯示
                               if (child.requirement === 'admin' && isAdmin) return true;
                               if (child.requirement === 'songfestStaff' && isSongfestStaff) return true;
+                              if (child.requirement === 'courseLead' && isCourseLead) return true;
                               // 其他情況一律不顯示
                               return false;
                             }

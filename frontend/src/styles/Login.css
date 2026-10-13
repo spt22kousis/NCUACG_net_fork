@@ -89,6 +89,13 @@
   text-decoration: underline;
 }
 .portal_submit_btn{
+  /* 原本靠 AssistantChat.css 的全域 button 樣式才有藍底，現在自己寫 */
+  padding: 10px;
+  border: none;
+  border-radius: 5px;
+  background-color: #9ca3af;
+  color: #fff;
+  font-size: 16px;
   opacity: 0.6;
   pointer-events: none;
 }
@@ -114,4 +121,19 @@
     border-radius: 0;
     margin: 20px auto;
   }
+}
+/* 驗證碼旁的「Refresh」 */
+.captcha-refresh {
+  margin-left: 8px;
+  padding: 4px 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  background-color: #f3f4f6;
+  color: #333;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.captcha-refresh:hover {
+  background-color: #e5e7eb;
 }

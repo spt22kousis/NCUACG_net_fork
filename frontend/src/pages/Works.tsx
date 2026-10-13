@@ -19,8 +19,28 @@ import {
 } from 'lucide-react';
 import { isAxiosError } from 'axios';
 import { api, getAccessToken } from '../api/client';
+import { categoryName } from '../api/club';
+import Sidebar from '../components/Sidebar';
 import { useAuth } from '../contexts/auth';
 import '../styles/Works.css';
+
+// 沒有縮圖、或圖片載入失敗時用的佔位圖（frontend/public/images/placeholders/）
+const PLACEHOLDER = {
+  image: '/images/placeholders/work-image.svg',
+  video: '/images/placeholders/work-video.svg',
+  empty: '/images/placeholders/empty-works.svg',
+};
+
+/** 圖片載入失敗時換成佔位圖（只換一次，避免佔位圖也壞掉時無限迴圈） */
+function makeFallback(kind: 'image' | 'video') {
+  return (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (!img.dataset.fallback) {
+      img.dataset.fallback = '1';
+      img.src = PLACEHOLDER[kind];
+    }
+  };
+}
 
 // 類型定義（對應後端 NCUACG/club/views.py 的輸出）
 interface Course {
@@ -67,7 +87,9 @@ type LikeResult = { likes: number; isLiked: boolean };
 
 const Works: React.FC = () => {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  // 社課負責人與幹部可以在網站上架作品（管理成果牆）
+  const canManage = Boolean(user?.courseLead) || user?.role === 'admin' || user?.role === 'superadmin';
   // 從社課介紹頁帶過來的種類，例如 /club/works?category=seiyuu；沒帶就顯示全部
   const [searchParams] = useSearchParams();
   const category = searchParams.get('category') || '';
@@ -95,8 +117,17 @@ const Works: React.FC = () => {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const courseListRef = useRef<HTMLDivElement>(null);
+  // 分類多到列表捲得動時才顯示上下捲動按鈕
+  const [canScroll, setCanScroll] = useState(false);
+  useEffect(() => {
+    const el = courseListRef.current;
+    setCanScroll(Boolean(el && el.scrollHeight > el.clientHeight + 1));
+  }, [courses]);
   // 避免 StrictMode 下 effect 跑兩次而重複累加瀏覽數
   const lastViewedRef = useRef<number | null>(null);
+
+  const imageFallback = makeFallback('image');
+  const videoFallback = makeFallback('video');
 
   const selectedIndex = works.findIndex(w => w.id === selectedWorkId);
   const selectedWork = selectedIndex >= 0 ? works[selectedIndex] : null;
@@ -390,8 +421,20 @@ const Works: React.FC = () => {
 
   return (
     <div className="showcase-container">
+      {/* 網站的側邊欄（右上角按鈕） */}
+      <Sidebar />
+
       {/* 左側導航欄 */}
       <div className="sidebar">
+        {/* 目前在看哪個社課的成果牆 */}
+        <div className="works-heading">
+          <Link to="/club" className="works-back">← 社課介紹</Link>
+          <h1>{category ? `${categoryName(category)}成果牆` : '成果牆'}</h1>
+          {category && <Link to={`/club/lessons?category=${category}`} className="works-lessons-link">看社課公告 →</Link>}
+        </div>
+
+        {courses.length > 0 && (
+        <>
         {/* 排序標題 */}
         <div className="sort-header">
           <button 
@@ -437,7 +480,8 @@ const Works: React.FC = () => {
             ))}
           </div>
 
-          {/* 滾動控制按鈕 */}
+          {/* 滾動控制按鈕（列表捲得動時才顯示） */}
+          {canScroll && (
           <div className="scroll-controls">
             <button
               className="scroll-button"
@@ -452,20 +496,39 @@ const Works: React.FC = () => {
               <ChevronDown className="w-3 h-3 text-gray-600" />
             </button>
           </div>
+          )}
         </div>
+        </>
+        )}
+        {!loading && courses.length === 0 && (
+          <p className="works-side-empty">還沒有成果分類</p>
+        )}
       </div>
 
       {/* 主要內容區 */}
       <div className="main-content">
         {!selectedWork ? (
           <div className="works-empty-state">
-            {loading
-              ? '載入中…'
-              : loadError
-                ? loadError
-                : courses.length === 0
-                  ? '目前還沒有社課'
-                  : '這個社課還沒有作品'}
+            {loading ? '載入中…' : (
+              <div className="works-empty-card">
+                <img src={PLACEHOLDER.empty} alt="" width={240} height={165} />
+                <h2>
+                  {loadError
+                    ? '載入失敗'
+                    : courses.length === 0
+                      ? `${category ? categoryName(category) : ''}成果牆還沒有作品`
+                      : '這個分類還沒有作品'}
+                </h2>
+                <p>
+                  {loadError ?? '社課的作品、CM、照片整理好之後會放在這裡。可以先看看社課公告，知道最近在上什麼。'}
+                </p>
+                <div className="works-empty-actions">
+                  {category && <Link to={`/club/lessons?category=${category}`} className="works-empty-button">看社課公告</Link>}
+                  <Link to="/club" className="works-empty-button">其他社課</Link>
+                  {canManage && <Link to="/club/works/manage" className="works-empty-button is-primary">上架作品</Link>}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
         <>
@@ -607,7 +670,8 @@ const Works: React.FC = () => {
                   ) : (
                     <div className="image-viewer">
                       <img 
-                        src={selectedWork.url || "data:image/svg+xml,%3Csvg width='400' height='300' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' fill='%23f0f0f0'/%3E%3Ctext x='50%25' y='50%25' font-family='Arial' font-size='18' fill='%23666' text-anchor='middle' dy='.3em'%3E圖片預覽%3C/text%3E%3C/svg%3E"}
+                        src={selectedWork.url || PLACEHOLDER.image}
+                        onError={imageFallback}
                         alt={selectedWork.title}
                         className="image-element"
                       />
@@ -628,14 +692,15 @@ const Works: React.FC = () => {
                       }}
                     >
                       <div className="grid-item-thumbnail">
-                        {work.type === 'video' ? (
-                          <Play className="w-8 h-8 text-gray-500" />
-                        ) : (
-                          <img 
-                            src={work.thumbnail || "data:image/svg+xml,%3Csvg width='200' height='150' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' fill='%23e0e0e0'/%3E%3Ctext x='50%25' y='50%25' font-family='Arial' font-size='12' fill='%23666' text-anchor='middle' dy='.3em'%3E縮圖%3C/text%3E%3C/svg%3E"}
-                            alt={work.title}
-                            className="grid-thumbnail-image"
-                          />
+                        <img
+                          src={work.thumbnail || PLACEHOLDER[work.type]}
+                          onError={work.type === 'video' ? videoFallback : imageFallback}
+                          alt={work.title}
+                          className="grid-thumbnail-image"
+                          loading="lazy"
+                        />
+                        {work.type === 'video' && work.thumbnail && (
+                          <span className="grid-play-badge" aria-hidden="true"><Play className="w-5 h-5" /></span>
                         )}
                       </div>
                       <div className="grid-item-info">

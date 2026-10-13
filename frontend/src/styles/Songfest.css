@@ -709,7 +709,7 @@ a.sf-link-card:hover {
   font-weight: 400;
 }
 
-/* 其他頁面的全域 input 樣式會把勾選框撐滿整行，這裡固定回原本大小 */
+/* 勾選框固定原本大小（以前 AssistantChat.css 的全域 input 樣式會把它撐滿整行，已修；留著當保險） */
 .sf-check input,
 .sf-radio-row input {
   flex: none;
@@ -1399,7 +1399,7 @@ a.sf-link-card:hover {
   border: 2px solid #000000;
   border-radius: 8px;
   background-color: #FFFFFF;
-  color: #1f2937; /* 全站的 button 樣式會蓋掉文字顏色 */
+  color: #1f2937;
   font-size: 15px;
   line-height: 1;
   font-weight: 700;

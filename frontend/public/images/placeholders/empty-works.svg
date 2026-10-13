@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 220" role="img" aria-label="還沒有作品">
+  <!-- 成果牆空狀態的插圖：空畫框加幾顆星星 -->
+  <rect x="60" y="40" width="200" height="140" rx="18" fill="#FFFFFF" stroke="#1f2937" stroke-width="6"/>
+  <rect x="78" y="58" width="164" height="104" rx="10" fill="#EFE7DC" stroke="#1f2937" stroke-width="3" stroke-dasharray="10 8"/>
+  <path d="M160 92 l7 14 15 2 -11 10 3 15 -14 -7 -14 7 3 -15 -11 -10 15 -2 Z" fill="#FFD84D" stroke="#1f2937" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M40 60 l4 8 9 1 -6 6 1 9 -8 -4 -8 4 1 -9 -6 -6 9 -1 Z" fill="#93C5FD" stroke="#1f2937" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M276 150 l4 8 9 1 -6 6 1 9 -8 -4 -8 4 1 -9 -6 -6 9 -1 Z" fill="#86EFAC" stroke="#1f2937" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="280" cy="50" r="6" fill="#FCA5A5" stroke="#1f2937" stroke-width="3"/>
+  <circle cx="44" cy="168" r="5" fill="#FFD84D" stroke="#1f2937" stroke-width="3"/>
+</svg>

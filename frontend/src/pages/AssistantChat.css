@@ -1,6 +1,7 @@
 .chat-container { height: 100%;display: flex;flex-direction: column; }
 .chat-window    { flex: 1;overflow-y: auto;border: 1px solid #ddd;padding: 1rem; }
-form            { display:flex;gap:.5rem;margin-top:.5rem }
-input           { flex:1;padding:.5rem;border:1px solid #ccc;border-radius:6px }
-button          { padding:.5rem 1rem;border:none;background:#4f8cff;color:#fff;border-radius:6px }
+/* 只套在 AI 助理頁：原本寫成全域的 form／input／button，會把全站的按鈕變成藍底、勾選框撐滿整行 */
+.chat-container form   { display:flex;gap:.5rem;margin-top:.5rem }
+.chat-container input  { flex:1;padding:.5rem;border:1px solid #ccc;border-radius:6px }
+.chat-container button { padding:.5rem 1rem;border:none;background:#4f8cff;color:#fff;border-radius:6px }
 .typing         { font-size:.8rem;color:#888;margin:.25rem }

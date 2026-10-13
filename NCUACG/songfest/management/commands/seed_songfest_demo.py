@@ -81,7 +81,6 @@ class Command(BaseCommand):
         festival.start_time = festival.start_time or dt.time(10)
         festival.end_time = festival.end_time or dt.time(17)
         festival.report_deadline = now + 3 * DAY
-        festival.partner_deadline = None
         festival.withdraw_deadline = now + 5 * DAY
         festival.upload_deadline = now + 7 * DAY
         festival.guest_deadline = now + 6 * DAY

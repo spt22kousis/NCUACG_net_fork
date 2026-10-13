@@ -28,7 +28,7 @@ class FestivalAdmin(admin.ModelAdmin):
         ("時間地點", {"fields": ("venue", "start_time", "end_time")}),
         ("公告", {"fields": ("description",)}),
         ("新曲投稿（沒填報曲截止就不開放投稿）", {
-            "fields": ("report_deadline", "partner_deadline", "withdraw_deadline", "upload_deadline",
+            "fields": ("report_deadline", "withdraw_deadline", "upload_deadline",
                        "partner_name", "partner_limit", "rules"),
         }),
         ("亂入曲", {"fields": ("guest_deadline", "guest_form_url", "guest_info")}),

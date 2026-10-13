@@ -155,7 +155,6 @@ export const FIVE_SEC_LABEL: Record<FiveSecStatus, string> = {
 
 export interface SongfestFestival extends Festival {
   reportDeadline: string | null;
-  partnerDeadline: string | null;
   withdrawDeadline: string | null;
   uploadDeadline: string | null;
   guestDeadline: string | null;

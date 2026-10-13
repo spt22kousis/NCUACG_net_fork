@@ -46,7 +46,7 @@ class SubmissionTestCase(TestCase):
         """把截止時間改成「現在 ± 幾天」，例如 report=-1 表示報曲已經截止一天"""
         now = timezone.now()
         names = {"report": "report_deadline", "withdraw": "withdraw_deadline", "upload": "upload_deadline",
-                 "partner": "partner_deadline", "guest": "guest_deadline"}
+                 "guest": "guest_deadline"}
         Festival.objects.filter(pk=self.festival.pk).update(
             **{names[k]: now + v * DAY for k, v in offsets.items()}
         )
@@ -125,10 +125,11 @@ class ReportTests(SubmissionTestCase):
         summary = auth_client(self.staffer).get(f"/api/songfest/festivals/{self.festival.id}/manage/").data["summary"]
         self.assertEqual((summary["bySource"]["partner"], summary["partnerBackups"]), (2, 1))
 
-    def test_report_closed_after_deadline_but_partner_can_have_later_deadline(self):
-        self.set_deadlines(report=-1, partner=2)
+    def test_report_deadline_applies_to_partner_too(self):
+        # 社外投稿規則：合作社團的期限跟社內相同
+        self.set_deadlines(report=-1)
         self.assertEqual(self.report(self.alice).status_code, 400)
-        self.assertEqual(self.report(self.alice, source="partner").status_code, 201)
+        self.assertEqual(self.report(self.alice, source="partner").status_code, 400)
 
     def test_edit_and_delete_before_deadline(self):
         sub_id = self.report(self.alice).data["id"]

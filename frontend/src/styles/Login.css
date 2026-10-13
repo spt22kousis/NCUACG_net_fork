@@ -29,7 +29,8 @@
   color: #333; /* 確保文字顏色為深色 */
 }
 
-form {
+/* 只套在登入、驗證信、忘記密碼這幾頁；原本寫成全域的 form，會把別頁的表單也變成直排 */
+.outercontainer form {
   display: flex;
   flex-direction: column;
   gap: 15px; /* 輸入框之間的間距 */

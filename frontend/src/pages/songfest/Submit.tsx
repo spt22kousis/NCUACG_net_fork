@@ -17,10 +17,7 @@ export function DeadlineList({ festival, guest = false }: { festival: SongfestFe
   const items = guest
     ? [{ label: '亂入曲截止', at: festival.guestDeadline }]
     : [
-        { label: '報曲截止（本社）', at: festival.reportDeadline },
-        ...(festival.partnerDeadline !== festival.reportDeadline
-          ? [{ label: `報曲截止（${festival.partnerName}）`, at: festival.partnerDeadline }]
-          : []),
+        { label: '報曲截止', at: festival.reportDeadline },
         { label: '窗歌截止', at: festival.withdrawDeadline },
         { label: '新曲與 5 秒畫面繳交截止', at: festival.uploadDeadline },
       ];

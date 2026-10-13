@@ -909,7 +909,7 @@ a.sf-link-card:hover {
 
 .sf-comment-form {
   display: flex;
-  flex-direction: row; /* 其他頁面的全域 form 樣式是直排 */
+  flex-direction: row;
   gap: 8px;
   margin-top: 8px;
 }

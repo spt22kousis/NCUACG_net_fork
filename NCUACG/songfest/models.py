@@ -35,10 +35,8 @@ class Festival(models.Model):
     is_published = models.BooleanField("公開", default=True)
 
     # 新曲投稿的截止時間（沒填就不開放投稿）。規則見「歌謠祭曲目投稿規則」
-    report_deadline = models.DateTimeField("報曲截止（社內）", null=True, blank=True)
-    partner_deadline = models.DateTimeField(
-        "報曲截止（合作社團）", null=True, blank=True, help_text="沒填就跟社內一樣"
-    )
+    # 社外投稿規則：合作社團的期限跟社內相同，所以只有一個報曲截止
+    report_deadline = models.DateTimeField("報曲截止", null=True, blank=True)
     withdraw_deadline = models.DateTimeField(
         "窗歌截止", null=True, blank=True, help_text="過了這個時間才窗歌，下次歌謠祭禁止報曲 1 次"
     )
@@ -69,8 +67,6 @@ class Festival(models.Model):
         return f"{self.name}（{self.date:%Y/%m/%d}）"
 
     def report_deadline_for(self, source: str):
-        if source == "partner":
-            return self.partner_deadline or self.report_deadline
         if source == "guest":
             return self.guest_deadline
         return self.report_deadline

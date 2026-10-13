@@ -65,7 +65,6 @@ def festival_info(f: Festival) -> dict:
     return {
         **_festival_to_dict(f),
         "reportDeadline": _iso(f.report_deadline),
-        "partnerDeadline": _iso(f.report_deadline_for("partner")),
         "withdrawDeadline": _iso(f.withdraw_deadline),
         "uploadDeadline": _iso(f.upload_deadline),
         "guestDeadline": _iso(f.guest_deadline),

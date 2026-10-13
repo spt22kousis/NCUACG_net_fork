@@ -47,7 +47,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField(
         "幹部",
         default=False,
-        help_text="勾選後可以登入後台，管理社課、成果牆與活動。",
+        help_text="勾選後可以登入後台，管理社課、成果牆、活動與歌謠祭；也可以發所有社課的公告、上傳所有照片。",
     )
 
     objects = UserManager()

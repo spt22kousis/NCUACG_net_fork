@@ -36,6 +36,7 @@ const Sidebar: React.FC = () => {
   const isSongfestStaff = isAdmin || Boolean(user?.songfestStaff);
   // 社課負責人也不一定是幹部
   const isCourseLead = isAdmin || Boolean(user?.courseLead);
+  const isCheckinManager = isAdmin || Boolean(user?.checkinManager);
   // 根據按鈕文字導航
   const navigate = useNavigate();
   const [activeMenu, setActive] = useState<string | null>(null);
@@ -43,7 +44,7 @@ const Sidebar: React.FC = () => {
 
 interface Requirement {
   name: string;
-  requirement?: 'public'|'member' | 'admin' | 'songfestStaff' | 'courseLead';
+  requirement?: 'public'|'member' | 'admin' | 'songfestStaff' | 'courseLead' | 'checkinManager';
 }
 interface Option {
   name: string;
@@ -83,7 +84,8 @@ const menuOptions: Option[] = [
     children: [
       { name: '行事曆', requirement: 'public' },
       { name: '活動公告一覽', requirement: 'public' },
-      { name: '相簿', requirement: 'member' }
+      { name: '相簿', requirement: 'member' },
+      { name: '活動簽到', requirement: 'checkinManager' }
     ]
   }
 ];
@@ -168,6 +170,8 @@ const menuOptions: Option[] = [
       navigate('/club/lessons/manage');
     } else if (item === '管理成果牆') {
       navigate('/club/works/manage');
+    } else if (item === '活動簽到') {
+      navigate('/checkin');
     } else if (item === '相簿') {
       navigate('/photos');
     } else if (item === '行事曆') {
@@ -291,6 +295,7 @@ const menuOptions: Option[] = [
                               if (child.requirement === 'admin' && isAdmin) return true;
                               if (child.requirement === 'songfestStaff' && isSongfestStaff) return true;
                               if (child.requirement === 'courseLead' && isCourseLead) return true;
+                              if (child.requirement === 'checkinManager' && isCheckinManager) return true;
                               // 其他情況一律不顯示
                               return false;
                             }

@@ -1,0 +1,1671 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>活動簽到</title>
+<script>
+/* ==========================================================================
+ * 設定（活動前請檢查這一段）
+ * ========================================================================== */
+// 場次與簽到時段由網站的「活動簽到」頁設定（網址帶 ?event=活動編號&key=掃描密鑰），這裡不用改。
+// 原本的 barcoder demo 是把場次寫在這裡；搬進網站後改成從 /api/checkin/scan/ 讀。
+const CONFIG = {
+  // 學號格式（套用在 normalize 之後的內容上）。預設 9 位數字。
+  idPattern: /^\d{9}$/,
+
+  // 掃到的原始內容如何整理成學號：去掉空白／控制字元、去掉 Code 39 的 * 起訖符號、轉大寫。
+  // 實測學生證條碼是 Code 128、10 位數字＝9 位學號＋1 碼卡片序號，所以 10 位數字只取前 9 碼。
+  // （原始條碼內容另外存在紀錄裡，明細 CSV 也會匯出。）
+  normalize: raw => {
+    const s = String(raw).replace(/[\s\u0000-\u001f\u007f]/g, '').replace(/^\*+|\*+$/g, '').toUpperCase();
+    return /^\d{10}$/.test(s) ? s.slice(0, 9) : s;
+  },
+
+  camera: {
+    width: 1920,            // 向瀏覽器要求的解析度（拿不到會自動降級）
+    height: 1080,
+    cooldownMs: 3000,       // 同一條碼持續被鏡頭讀到時，這段時間內不重複觸發
+    scanIntervalMs: 40,     // 兩次解碼之間的間隔
+    formats: ['Code128', 'Code39'],  // 實測學生證是 Code128；確定用不到 Code39 可以拿掉，能再降低誤讀
+    tiltAngles: [8, -8, 16, -16],    // 除了正放，每格輪流多試一個傾斜角度（度），卡片拿歪一點也讀得到
+    aimWidthRatio: 0.8,     // 對準框寬度佔畫面寬度的比例
+  },
+
+  flashMs: 1600,            // 成功／失敗全畫面閃色的時間
+  sound: true,              // 提示音
+  testTimeoutSec: 15,       // 測試模式：超過幾秒沒讀到就算失敗
+  storageKey: 'ncuacg-checkin',   // 實際的 key 會加上活動編號，見下面的 EVENT_ID
+  syncIntervalMs: 5000,          // 多久上傳一次還沒上傳的紀錄
+  refreshIntervalMs: 20000,      // 多久重新讀一次各場人數（別台裝置掃的也算）
+};
+
+// 網址上的活動編號與掃描密鑰
+const PARAMS = new URLSearchParams(location.search);
+const EVENT_ID = PARAMS.get('event');
+const SCAN_KEY = PARAMS.get('key');
+if (EVENT_ID) CONFIG.storageKey += '-' + EVENT_ID;
+</script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #1a1e26;
+    --panel-2: #232835;
+    --line: #333a48;
+    --text: #f3f5f9;
+    --muted: #a3acbb;
+    --ok: #16a34a;
+    --dup: #d97706;
+    --fail: #dc2626;
+    --accent: #60a5fa;
+    --test: #7c3aed;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 20px; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", "Heiti TC", system-ui, sans-serif;
+    line-height: 1.4;
+    min-height: 100vh;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button {
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    min-height: 2.4rem;
+  }
+  button:hover { border-color: var(--accent); }
+  button.danger { border-color: #7f1d1d; color: #fecaca; }
+  button.primary { background: #1d4ed8; border-color: #1d4ed8; }
+  input[type=text], select {
+    background: #0b0d11;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 0.45rem 0.7rem;
+    min-height: 2.4rem;
+    min-width: 0;
+  }
+  input[type=text]:focus, select:focus { outline: 3px solid var(--accent); outline-offset: 1px; }
+  .hidden { display: none !important; }
+  .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+
+  header {
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+    padding: 0.6rem 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 1.5rem; margin: 0; }
+  .tabs { display: flex; gap: 0.4rem; }
+  .tabs button[aria-pressed=true] { background: var(--accent); color: #0b1220; border-color: var(--accent); font-weight: 700; }
+  .tabs button[data-mode=test][aria-pressed=true] { background: var(--test); color: #fff; border-color: var(--test); }
+  #clock { margin-left: auto; font-size: 1.6rem; font-variant-numeric: tabular-nums; font-weight: 700; }
+
+  .banner { padding: 0.5rem 16px; font-weight: 700; }
+  .banner.warn { background: #7f1d1d; }
+  .banner.sim { background: #854d0e; }
+  .banner.test { background: repeating-linear-gradient(45deg, #5b21b6, #5b21b6 18px, #6d28d9 18px, #6d28d9 36px); text-align: center; font-size: 1.2rem; }
+  .banner.info { background: #1e3a5f; cursor: pointer; }
+
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 16px;
+    padding: 16px;
+  }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; min-width: 0; }
+  /* 電腦：鏡頭在左、資訊在右（HTML 裡資訊在前，手機上自然排在鏡頭上方） */
+  #camPanel { grid-column: 1; grid-row: 1; }
+  #checkinView, #testView { grid-column: 2; grid-row: 1; }
+
+  /* ---- 鏡頭 ---- */
+  .video-wrap {
+    position: relative;
+    height: min(62vh, 640px);
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .video-wrap video { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .video-wrap video.mirror { transform: scaleX(-1); }
+  .aim-box {
+    position: absolute;
+    border: 4px solid #4ade80;
+    border-radius: 10px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+  }
+  .aim-box::after {
+    content: ""; position: absolute; left: 4%; right: 4%; top: 50%;
+    height: 3px; background: rgba(248, 113, 113, 0.9);
+    box-shadow: 0 0 8px rgba(248, 113, 113, 0.9);
+  }
+  .aim-box span {
+    position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%);
+    margin-bottom: 8px; white-space: nowrap; font-weight: 700; font-size: 1.2rem;
+    text-shadow: 0 1px 4px #000;
+  }
+  .aim-box.nolabel span { display: none; }
+  .cam-msg {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    text-align: center; padding: 16px; color: var(--muted); font-size: 1.2rem;
+  }
+  .cam-controls { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin-top: 0.7rem; }
+  .cam-controls select { flex: 1 1 14rem; }
+  .cam-info { color: var(--muted); font-size: 0.85rem; margin-top: 0.4rem; }
+
+  /* ---- 簽到狀態 ---- */
+  .label { color: var(--muted); font-size: 1rem; }
+  .session-name { font-size: clamp(2.2rem, 4.2vw, 3.6rem); font-weight: 900; line-height: 1.15; margin: 0.1rem 0 0.2rem; }
+  .session-name.off { color: #fca5a5; }
+  .session-window { color: var(--muted); font-size: 1.05rem; }
+  .count-box { display: flex; align-items: baseline; gap: 0.6rem; margin: 0.8rem 0 0.4rem; flex-wrap: wrap; }
+  .count { font-size: clamp(4.5rem, 9vw, 8rem); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; color: #86efac; }
+  .count-unit { font-size: 1.6rem; font-weight: 700; }
+  .today-counts { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.6rem; }
+  .today-counts div { background: var(--panel-2); border-radius: 10px; padding: 0.3rem 0.7rem; font-size: 1rem; color: var(--muted); }
+  .today-counts div.now { outline: 2px solid #86efac; color: var(--text); }
+  .last-result { margin-top: 1rem; padding: 0.8rem 1rem; border-radius: 12px; background: var(--panel-2); font-size: 1.4rem; font-weight: 700; min-height: 3.6rem; }
+  .last-result.ok { background: #14532d; }
+  .last-result.dup { background: #78350f; }
+  .last-result.fail { background: #7f1d1d; }
+  .last-result small { display: block; font-size: 1rem; font-weight: 400; color: #e5e7eb; }
+
+  /* ---- 測試模式 ---- */
+  .test-grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.3rem 0.8rem; align-items: baseline; }
+  .test-grid .v { font-size: 1.3rem; font-weight: 700; word-break: break-all; }
+  #tRaw { font-size: 1.8rem; }
+  .test-live { padding: 0.7rem; border-radius: 12px; background: var(--panel-2); transition: background 0.3s; }
+  .test-live.pulse { background: #4c1d95; transition: none; }
+  .timer-row { display: flex; align-items: center; gap: 1rem; margin: 1rem 0; flex-wrap: wrap; }
+  .timer { font-size: 3rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .timer.running { color: #fbbf24; }
+  #tStartBtn { font-size: 1.3rem; padding: 0.6rem 1.4rem; background: var(--test); border-color: var(--test); color: #fff; }
+  .test-stats { font-size: 1.1rem; margin-bottom: 0.6rem; }
+  .table-wrap { max-height: 16rem; overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+  td.raw { white-space: normal; word-break: break-all; }
+  th { position: sticky; top: 0; background: var(--panel-2); }
+  .perf { color: var(--muted); font-size: 0.9rem; margin-top: 0.6rem; }
+
+  /* ---- 工作人員區 ---- */
+  footer.staff {
+    margin: 0 16px 16px;
+    display: grid; gap: 0.8rem;
+  }
+  .input-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+  .input-row label { min-width: 7.5rem; font-weight: 700; }
+  .input-row input { flex: 1 1 12rem; }
+  .scanner-state { font-size: 0.95rem; font-weight: 700; }
+  .scanner-state.on { color: #86efac; }
+  .scanner-state.off { color: #fbbf24; cursor: pointer; }
+  .btn-row { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
+  .btn-row .info { color: var(--muted); font-size: 0.95rem; }
+  details summary { cursor: pointer; color: var(--muted); }
+  #recentList { margin: 0.5rem 0 0; padding-left: 1.5rem; font-size: 0.95rem; color: var(--muted); }
+
+  /* ---- 全畫面閃色 ---- */
+  .flash {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 16px; text-align: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.35s;
+  }
+  .flash.show { opacity: 1; transition: none; }
+  .flash.ok { background: rgba(22, 163, 74, 0.95); }
+  .flash.dup { background: rgba(217, 119, 6, 0.95); }
+  .flash.fail { background: rgba(220, 38, 38, 0.95); }
+  .flash-title { font-size: clamp(3rem, 10vw, 9rem); font-weight: 900; line-height: 1.1; }
+  .flash-detail { font-size: clamp(1.6rem, 4.6vw, 4.2rem); font-weight: 700; margin-top: 0.4em; word-break: break-all; }
+
+  @media (max-width: 900px) {
+    html { font-size: 17px; }
+    header { padding: 0.4rem 12px; gap: 0.6rem; }
+    header h1 { display: none; }
+    #clock { font-size: 1.3rem; }
+    .banner { padding: 0.35rem 12px; font-size: 0.85rem; }
+    .banner.test { font-size: 1rem; }
+    main { grid-template-columns: minmax(0, 1fr); padding: 10px 12px; gap: 10px; }
+    .panel { padding: 10px; border-radius: 12px; }
+    footer.staff { margin: 0 12px 12px; }
+
+    #camPanel, #checkinView, #testView { grid-column: auto; grid-row: auto; }
+
+    /* 手機：場次與人數放在鏡頭上方，縮成一列 */
+    #checkinView { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 0 0.8rem; }
+    #checkinView > .label { display: none; }
+    .session-name { font-size: 1.7rem; margin: 0; }
+    .session-window { grid-column: 1; font-size: 0.8rem; }
+    .count-box { grid-column: 2; grid-row: 1 / span 2; margin: 0; flex-direction: column; align-items: flex-end; gap: 0; }
+    .count-box .label { font-size: 0.75rem; }
+    .count { font-size: 2.8rem; }
+    .count-unit { font-size: 1rem; }
+    .today-counts { grid-column: 1 / -1; margin-top: 0.4rem; gap: 0.35rem; }
+    .today-counts div { font-size: 0.8rem; padding: 0.15rem 0.5rem; }
+    .last-result { grid-column: 1 / -1; font-size: 1.05rem; min-height: 0; margin-top: 0.5rem; padding: 0.45rem 0.7rem; }
+    .last-result small { font-size: 0.8rem; }
+
+    /* 鏡頭畫面依影像比例決定高度（比例由 JS 設定），裁切填滿，不留黑邊；最高不超過螢幕高度的 55% */
+    .video-wrap { width: 100%; height: auto; aspect-ratio: var(--cam-ar, 4 / 3); max-height: 55vh; max-height: 55svh; }
+    .video-wrap video { object-fit: cover; }
+    .aim-box span { font-size: 0.95rem; }
+    .cam-controls { margin-top: 0.5rem; gap: 0.4rem; }
+    .cam-controls select { flex-basis: 9rem; }
+    .cam-info { font-size: 0.75rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="eventTitle">活動簽到</h1>
+  <nav class="tabs" aria-label="模式">
+    <button type="button" data-mode="checkin" aria-pressed="true">簽到</button>
+    <button type="button" data-mode="test" aria-pressed="false">測試模式</button>
+  </nav>
+  <div id="clock">--:--:--</div>
+</header>
+<div id="bannerFatal" class="banner warn hidden"></div>
+<div id="bannerSync" class="banner sim hidden"></div>
+<div id="bannerClock" class="banner sim hidden"></div>
+<div id="bannerStorage" class="banner warn hidden">⚠ 無法寫入瀏覽器儲存空間，重新整理會遺失資料！請盡快按「匯出 CSV」。</div>
+<div id="bannerSim" class="banner sim hidden"></div>
+<div id="bannerAudio" class="banner info hidden">🔇 點一下畫面任一處以啟用提示音</div>
+<div id="bannerTest" class="banner test hidden">測試模式：掃描結果不會寫入簽到紀錄</div>
+
+<main>
+  <section class="panel" id="checkinView">
+    <div class="label">目前場次</div>
+    <div id="sessionName" class="session-name">—</div>
+    <div id="sessionWindow" class="session-window"></div>
+    <div class="count-box">
+      <span class="label">本場已簽到</span>
+      <span class="count-num"><span id="sessionCount" class="count">—</span> <span class="count-unit">人</span></span>
+    </div>
+    <div id="todayCounts" class="today-counts"></div>
+    <div id="lastResult" class="last-result" aria-live="polite">請掃描學生證背面的條碼</div>
+  </section>
+
+  <section class="panel" id="camPanel">
+    <div class="video-wrap" id="videoWrap">
+      <video id="video" playsinline muted autoplay></video>
+      <div id="aimBox" class="aim-box hidden"><span>條碼放進框內・別貼太近</span></div>
+      <div id="camMsg" class="cam-msg">鏡頭未開啟</div>
+    </div>
+    <div class="cam-controls">
+      <select id="camSelect" aria-label="選擇鏡頭"></select>
+      <button type="button" id="camToggle">開啟鏡頭</button>
+      <label><input type="checkbox" id="mirrorChk"> 鏡像</label>
+    </div>
+    <div id="camInfo" class="cam-info"></div>
+  </section>
+
+  <section class="panel hidden" id="testView">
+    <div class="test-live" id="tLive">
+      <div class="test-grid">
+        <span class="label">原始內容</span><span class="v mono" id="tRaw">—</span>
+        <span class="label">長度</span><span class="v" id="tLen">—</span>
+        <span class="label">條碼格式</span><span class="v" id="tFormat">—</span>
+        <span class="label">學號格式</span><span class="v" id="tMatch">—</span>
+        <span class="label">讀到次數</span><span class="v" id="tHits">0</span>
+      </div>
+    </div>
+    <div class="timer-row">
+      <button type="button" id="tStartBtn">開始計時（空白鍵）</button>
+      <span id="tTimer" class="timer">0.0 秒</span>
+    </div>
+    <div class="test-stats" id="tStats">尚未測試。按「開始計時」後把條碼對準框內。</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>結果</th><th>秒數</th><th>解碼畫格</th><th>格式</th><th>內容</th></tr></thead>
+        <tbody id="tBody"></tbody>
+      </table>
+    </div>
+    <div class="btn-row" style="margin-top:0.6rem">
+      <button type="button" id="tResetBtn">清除測試統計</button>
+      <button type="button" id="tSaveBtn" title="存成 PNG，可以拿來調整辨識參數。畫面裡有學生證，用完請刪除。">存下目前鏡頭畫面（S 鍵）</button>
+    </div>
+    <div class="perf" id="tPerf"></div>
+  </section>
+</main>
+
+<footer class="staff panel">
+  <div class="input-row">
+    <label for="scannerInput">掃描槍</label>
+    <input type="text" id="scannerInput" inputmode="none" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" lang="en" placeholder="掃描槍輸入框（會自動取得焦點）">
+    <span id="scannerState" class="scanner-state"></span>
+  </div>
+  <form id="manualForm" class="input-row" autocomplete="off">
+    <label for="manualInput">手動輸入</label>
+    <input type="text" id="manualInput" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="忘記帶學生證時，由工作人員輸入學號">
+    <button type="submit" class="primary">登記（手動）</button>
+  </form>
+  <div class="btn-row">
+    <button type="button" id="exportBtn" title="正式的名單請負責人在網站的「活動簽到」頁下載；這裡是這台裝置的備份">匯出這台裝置的 CSV</button>
+    <button type="button" id="clearBtn" class="danger">清除這台裝置的資料</button>
+    <span id="totalInfo" class="info"></span>
+  </div>
+  <details>
+    <summary>最近紀錄</summary>
+    <ol id="recentList" reversed></ol>
+  </details>
+</footer>
+
+<div id="flash" class="flash" aria-hidden="true">
+  <div class="flash-title" id="flashTitle"></div>
+  <div class="flash-detail" id="flashDetail"></div>
+</div>
+
+<!-- 主要辨識引擎：zxing-wasm（ZXing C++ 版），失敗時退回 @zxing/library -->
+<script src="vendor/zxing-wasm-3.1.4/zxing-reader.iife.js"></script>
+<script src="vendor/zxing-library-0.21.3.min.js"></script>
+<script>
+'use strict';
+
+const $ = id => document.getElementById(id);
+const SOURCE_LABEL = { camera: '鏡頭', scanner: '掃描槍', manual: '手動' };
+const PREFS_KEY = 'ncuacg-checkin-prefs';
+const pad = n => String(n).padStart(2, '0');
+
+/* ---------------- 安全的 localStorage ---------------- */
+function lsGet(key) {
+  try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+function lsSet(key, value) {
+  try { localStorage.setItem(key, value); return true; } catch (e) { return false; }
+}
+function lsRemove(key) {
+  try { localStorage.removeItem(key); } catch (e) { /* ignore */ }
+}
+function lsKeys() {
+  try { return Object.keys(localStorage); } catch (e) { return []; }
+}
+
+let prefs = {};
+try { prefs = JSON.parse(lsGet(PREFS_KEY) || '{}') || {}; } catch (e) { prefs = {}; }
+function savePrefs() { lsSet(PREFS_KEY, JSON.stringify(prefs)); }
+
+/* ---------------- 時鐘（支援 ?time=10:30 模擬時間） ---------------- */
+let clockOffsetMs = 0;
+(function initSimulatedTime() {
+  const p = new URLSearchParams(location.search).get('time');
+  if (!p) return;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(p);
+  let target;
+  if (m) { target = new Date(); target.setHours(+m[1], +m[2], 0, 0); }
+  else target = new Date(p);
+  if (isNaN(target.getTime())) return;
+  clockOffsetMs = target.getTime() - Date.now();
+  const b = $('bannerSim');
+  b.textContent = '⚠ 模擬時間模式（網址含 ?time=）：只供測試，正式活動請用不含參數的網址，並在活動前清除資料。';
+  b.classList.remove('hidden');
+})();
+function now() { return new Date(Date.now() + clockOffsetMs); }
+function ymd(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function hms(d) { return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; }
+
+/* ---------------- 場次判斷（場次由網站提供） ---------------- */
+let EVENT = null;   // { id, title }
+let SLOTS = [];     // [{ id, name, startsAt, endsAt, opensAt, closesAt, count }]，時間都是毫秒
+function fmtTime(ms) {
+  const d = new Date(ms);
+  const t = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return ymd(d) === ymd(now()) ? t : `${d.getMonth() + 1}/${d.getDate()} ${t}`;
+}
+function windowOf(s) { return { from: s.opensAt, to: s.closesAt }; }
+function currentSession(d) {
+  const t = d.getTime();
+  return SLOTS.find(s => t >= s.opensAt && t < s.closesAt) || null;
+}
+function nextSession(d) {
+  const t = d.getTime();
+  return SLOTS.filter(s => s.opensAt > t).sort((a, b) => a.opensAt - b.opensAt)[0] || null;
+}
+function sessionName(id) { const s = SLOTS.find(x => x.id === id); return s ? s.name : String(id); }
+
+/* ---------------- 紀錄 ---------------- */
+let records = [];
+let recordIndex = new Set();
+const recKey = (date, session, sid) => `${date}|${session}|${sid}`;
+
+function loadRecords() {
+  const raw = lsGet(CONFIG.storageKey);
+  records = [];
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) records = parsed;
+    } catch (e) {
+      // 資料損毀時先備份原始字串，避免被覆蓋
+      lsSet(CONFIG.storageKey + '-corrupt-' + Date.now(), raw);
+    }
+  }
+  recordIndex = new Set(records.map(r => recKey(r.date, r.session, r.sid)));
+}
+function saveRecords() {
+  const ok = lsSet(CONFIG.storageKey, JSON.stringify(records));
+  $('bannerStorage').classList.toggle('hidden', ok);
+  return ok;
+}
+// 各場人數：網站上的人數（含別台裝置）＋這台還沒上傳的
+function slotCount(slotId) {
+  const s = SLOTS.find(x => x.id === slotId);
+  let pending = 0;
+  for (const r of records) if (r.session === slotId && !r.synced) pending++;
+  return (s ? s.count : 0) + pending;
+}
+const last3 = id => id.slice(-3);
+
+/* ---------------- 回饋：閃色＋聲音 ---------------- */
+let audioCtx = null;
+function initAudio() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  } catch (e) { audioCtx = null; }
+  $('bannerAudio').classList.toggle('hidden', !(CONFIG.sound && audioCtx && audioCtx.state !== 'running'));
+}
+function unlockAudio() {
+  initAudio();
+  if (audioCtx) audioCtx.resume().then(() => $('bannerAudio').classList.add('hidden')).catch(() => {});
+}
+document.addEventListener('pointerdown', unlockAudio);
+document.addEventListener('keydown', unlockAudio);
+
+function tone(freq, start, dur, type = 'sine', vol = 0.35) {
+  const t0 = audioCtx.currentTime + start;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type;
+  o.frequency.value = freq;
+  g.gain.setValueAtTime(vol, t0);
+  g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(t0);
+  o.stop(t0 + dur + 0.02);
+}
+function beep(kind) {
+  if (!CONFIG.sound || !audioCtx || audioCtx.state !== 'running') return;
+  try {
+    if (kind === 'ok') { tone(1046, 0, 0.12); tone(1568, 0.13, 0.2); }
+    else if (kind === 'dup') { tone(660, 0, 0.25, 'triangle'); }
+    else if (kind === 'test') { tone(1318, 0, 0.1); }
+    else { tone(220, 0, 0.18, 'square', 0.25); tone(180, 0.22, 0.3, 'square', 0.25); }
+  } catch (e) { /* ignore */ }
+}
+
+let flashTimer = null;
+function feedback(kind, title, detail) {
+  const f = $('flash');
+  $('flashTitle').textContent = title;
+  $('flashDetail').textContent = detail || '';
+  f.className = 'flash show ' + kind;
+  clearTimeout(flashTimer);
+  flashTimer = setTimeout(() => f.classList.remove('show'), CONFIG.flashMs);
+  beep(kind);
+
+  const lr = $('lastResult');
+  lr.className = 'last-result ' + kind;
+  lr.textContent = title;
+  const small = document.createElement('small');
+  small.textContent = `${detail || ''}（${hms(now())}）`;
+  lr.appendChild(small);
+}
+
+/* ---------------- 掃描處理 ---------------- */
+let mode = 'checkin';
+const BOPOMOFO = /[㄀-ㄯˇˉˊˋ˙]/;
+
+function visible(s) {
+  return String(s)
+    .replace(/[\u0000-\u001f\u007f]/g, c => '\\x' + c.charCodeAt(0).toString(16).padStart(2, '0'))
+    .replace(/ /g, '␠');
+}
+function truncate(s, n) { return s.length > n ? s.slice(0, n) + '…' : s; }
+
+// 回傳 'ok' | 'dup' | 'fail'
+function handleScan(raw, source, format) {
+  if (mode === 'test') { testOnScan(raw, format, source, false); return 'test'; }
+
+  const d = now();
+  const s = currentSession(d);
+  if (!s) {
+    const next = nextSession(d);
+    feedback('fail', '目前不在簽到時間', (next ? `下一場「${next.name}」${fmtTime(windowOf(next).from)} 開始簽到` : '這個活動的簽到時段已結束') + '・未記錄');
+    return 'fail';
+  }
+  if (BOPOMOFO.test(raw)) {
+    feedback('fail', '輸入法不是英文', '請把電腦輸入法切換成英數模式後重掃');
+    return 'fail';
+  }
+  const sid = CONFIG.normalize(raw);
+  if (!CONFIG.idPattern.test(sid)) {
+    feedback('fail', '學號格式不符', '掃到的內容：' + truncate(visible(raw), 40));
+    return 'fail';
+  }
+  const date = ymd(d);
+  if (recordIndex.has(recKey(date, s.id, sid))) {
+    feedback('dup', '這場已經簽過了', `學號末三碼 ${last3(sid)}・${s.name}`);
+    return 'dup';
+  }
+  records.push({ cid: newId(), sid, ts: d.getTime(), date, session: s.id, name: s.name, src: source, raw: String(raw).trim(), synced: false });
+  recordIndex.add(recKey(date, s.id, sid));
+  saveRecords();
+  setTimeout(syncNow, 300);
+  feedback('ok', '✓ 簽到成功', `學號末三碼 ${last3(sid)}・${s.name}` + (source === 'manual' ? '・手動' : ''));
+  render();
+  return 'ok';
+}
+
+/* ---------------- 掃描槍輸入框 ---------------- */
+const scannerInput = $('scannerInput');
+const manualInput = $('manualInput');
+
+scannerInput.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.isComposing) return;
+  e.preventDefault();
+  const v = scannerInput.value;
+  scannerInput.value = '';
+  if (v.trim()) handleScan(v, 'scanner', null);
+});
+
+let otherFocusAt = 0;
+document.addEventListener('focusin', e => { if (e.target !== scannerInput) otherFocusAt = Date.now(); });
+function focusScanner() {
+  const a = document.activeElement;
+  if (a === scannerInput) return;
+  // 工作人員正在用手動輸入框（有自己的閒置計時）或剛點開下拉選單時不要搶焦點
+  if (a === manualInput) return;
+  if (a && a.tagName === 'SELECT' && Date.now() - otherFocusAt < 8000) return;
+  scannerInput.focus({ preventScroll: true });
+}
+function updateScannerState() {
+  const el = $('scannerState');
+  const on = document.activeElement === scannerInput && document.hasFocus();
+  el.className = 'scanner-state ' + (on ? 'on' : 'off');
+  el.textContent = on ? '● 待命中' : '○ 未待命（點這裡）';
+}
+scannerInput.addEventListener('focus', updateScannerState);
+scannerInput.addEventListener('blur', () => { updateScannerState(); setTimeout(focusScanner, 150); });
+window.addEventListener('focus', () => { focusScanner(); updateScannerState(); });
+window.addEventListener('blur', updateScannerState);
+document.addEventListener('click', () => setTimeout(focusScanner, 0));
+$('scannerState').addEventListener('click', () => scannerInput.focus());
+setInterval(() => { focusScanner(); updateScannerState(); }, 1000);
+
+/* ---------------- 手動輸入 ---------------- */
+let manualIdleTimer = null;
+function armManualIdle() {
+  // 手動輸入框閒置 15 秒就把焦點還給掃描槍，避免掃描槍的輸入被誤記為「手動」
+  clearTimeout(manualIdleTimer);
+  manualIdleTimer = setTimeout(() => {
+    if (document.activeElement === manualInput) { manualInput.blur(); focusScanner(); }
+  }, 15000);
+}
+manualInput.addEventListener('focus', armManualIdle);
+manualInput.addEventListener('input', armManualIdle);
+$('manualForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = manualInput.value;
+  if (!v.trim()) return;
+  const r = handleScan(v, 'manual', null);
+  if (r !== 'fail') { manualInput.value = ''; manualInput.blur(); focusScanner(); }
+});
+
+/* ---------------- 鏡頭 ---------------- */
+const video = $('video');
+const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+const camSelect = $('camSelect');
+const canvas = document.createElement('canvas');
+const ctx2d = canvas.getContext('2d', { willReadFrequently: true });
+const canvas2 = document.createElement('canvas');   // 「水平放大」用
+const ctx2 = canvas2.getContext('2d', { willReadFrequently: true });
+let stream = null;
+let scanTimer = null;
+let scanGen = 0;      // 每次開關鏡頭 +1，讓舊的解碼迴圈自行結束
+let passIdx = 0;
+let focusInfo = '';
+let capsInfo = '';
+const perf = { frames: 0, totalFrames: 0, ms: 0, since: performance.now(), text: '' };
+let lastCode = null, lastCodeAt = 0;
+
+// 解碼引擎：decode(cv, cx) 讀取 canvas 目前內容，回傳 { text, format } 或 null
+let engine = null;
+const decoderReady = initDecoder();
+
+async function initDecoder() {
+  if (window.ZXingWASM) {
+    try {
+      const wasmUrl = new URL('vendor/zxing-wasm-3.1.4/zxing_reader.wasm', location.href).href;
+      await Promise.race([
+        ZXingWASM.prepareZXingModule({
+          overrides: { locateFile: (path, prefix) => path.endsWith('.wasm') ? wasmUrl : prefix + path },
+          fireImmediately: true,
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 10000)),
+      ]);
+      const opts = { formats: CONFIG.camera.formats, tryHarder: true, tryRotate: false, tryInvert: false, maxNumberOfSymbols: 1 };
+      engine = {
+        name: 'zxing-cpp（WebAssembly）',
+        tilt: true,
+        decode(cv, cx) { return this.decodeImage(cx.getImageData(0, 0, cv.width, cv.height)); },
+        async decodeImage(img) {
+          const res = await ZXingWASM.readBarcodes(img, opts);
+          const hit = res.find(r => r.isValid);
+          return hit ? { text: hit.text, format: hit.format } : null;
+        },
+      };
+      return;
+    } catch (e) {
+      console.warn('zxing-wasm 載入失敗，改用 @zxing/library', e);
+    }
+  }
+  if (window.ZXing) {
+    const Z = window.ZXing;
+    const hints = new Map();
+    const fmt = { Code128: Z.BarcodeFormat.CODE_128, Code39: Z.BarcodeFormat.CODE_39 };
+    hints.set(Z.DecodeHintType.POSSIBLE_FORMATS, CONFIG.camera.formats.map(f => fmt[f]).filter(f => f !== undefined));
+    hints.set(Z.DecodeHintType.TRY_HARDER, true);
+    const reader = new Z.MultiFormatReader();
+    reader.setHints(hints);
+    engine = {
+      name: '@zxing/library（備援）',
+      tilt: false, // 這個引擎慢很多，不做額外角度
+      async decode(cv) {
+        try {
+          const res = reader.decodeWithState(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(cv))));
+          return { text: res.getText(), format: String(Z.BarcodeFormat[res.getBarcodeFormat()]).replace('CODE_', 'Code') };
+        } catch (e) {
+          if (!(e instanceof Z.NotFoundException || e instanceof Z.ChecksumException || e instanceof Z.FormatException)) console.warn('decode error', e);
+          return null;
+        }
+      },
+    };
+  }
+}
+
+function camMsg(text) {
+  const el = $('camMsg');
+  el.textContent = text || '';
+  el.classList.toggle('hidden', !text);
+}
+
+async function refreshCameraList() {
+  let devices = [];
+  try {
+    devices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput' && d.deviceId);
+  } catch (e) { /* ignore */ }
+  const want = prefs.camera || 'auto';
+  camSelect.innerHTML = '';
+  const add = (value, label) => { const o = document.createElement('option'); o.value = value; o.textContent = label; camSelect.appendChild(o); };
+  add('auto', IS_MOBILE ? '自動（後鏡頭）' : '自動（預設鏡頭）');
+  add('user', '前鏡頭');
+  devices.forEach((d, i) => add(d.deviceId, d.label || `鏡頭 ${i + 1}`));
+  camSelect.value = [...camSelect.options].some(o => o.value === want) ? want : 'auto';
+}
+
+function videoConstraints(choice) {
+  const v = { width: { ideal: CONFIG.camera.width }, height: { ideal: CONFIG.camera.height } };
+  if (choice === 'user') v.facingMode = { ideal: 'user' };
+  else if (choice && choice !== 'auto') v.deviceId = { exact: choice };
+  else v.facingMode = { ideal: 'environment' };
+  return v;
+}
+
+async function tryContinuousFocus(track) {
+  try {
+    const caps = typeof track.getCapabilities === 'function' ? track.getCapabilities() : {};
+    if (caps.focusMode && caps.focusMode.includes('continuous')) {
+      await track.applyConstraints({
+        width: { ideal: CONFIG.camera.width }, height: { ideal: CONFIG.camera.height },
+        advanced: [{ focusMode: 'continuous' }],
+      });
+      return '對焦：已開啟連續自動對焦';
+    }
+    return '對焦：此鏡頭不開放網頁設定，由鏡頭自動處理';
+  } catch (e) {
+    return '對焦：設定失敗，由鏡頭自動處理';
+  }
+}
+
+async function startCamera() {
+  stopCamera();
+  await decoderReady;
+  if (!engine) { camMsg('找不到 vendor/ 裡的條碼辨識函式庫，鏡頭辨識無法使用。掃描槍與手動輸入仍可使用。'); return; }
+  if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    camMsg('鏡頭需要透過 localhost 或 HTTPS 開啟頁面。掃描槍與手動輸入仍可使用。');
+    return;
+  }
+  camMsg('正在開啟鏡頭…');
+  const choice = camSelect.value || prefs.camera || 'auto';
+  const base = videoConstraints(choice);
+  const attempts = [
+    Object.assign({}, base, { advanced: [{ focusMode: 'continuous' }] }),
+    base,
+    { facingMode: { ideal: 'environment' } },
+    true,
+  ];
+  let lastErr = null;
+  for (const v of attempts) {
+    try { stream = await navigator.mediaDevices.getUserMedia({ video: v, audio: false }); break; }
+    catch (e) { lastErr = e; if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) break; }
+  }
+  if (!stream) {
+    const name = lastErr && lastErr.name;
+    camMsg(name === 'NotAllowedError' ? '鏡頭權限被拒絕。請在網址列左側允許使用鏡頭後，再按「開啟鏡頭」。'
+         : name === 'NotFoundError' ? '找不到鏡頭。掃描槍與手動輸入仍可使用。'
+         : name === 'NotReadableError' ? '鏡頭被其他程式占用（例如視訊軟體），請關閉後再試。'
+         : '無法開啟鏡頭：' + (name || lastErr));
+    updateCamToggle();
+    return;
+  }
+  const track = stream.getVideoTracks()[0];
+  video.srcObject = stream;
+  try { await video.play(); } catch (e) { /* autoplay 被擋時，muted video 通常仍會播放 */ }
+  focusInfo = await tryContinuousFocus(track);
+  try {
+    const caps = typeof track.getCapabilities === 'function' ? track.getCapabilities() : {};
+    capsInfo = caps.width && caps.height ? `（鏡頭最高 ${caps.width.max}×${caps.height.max}）` : '';
+  } catch (e) { capsInfo = ''; }
+  await refreshCameraList();
+
+  const st = typeof track.getSettings === 'function' ? track.getSettings() : {};
+  const mirror = st.facingMode ? st.facingMode === 'user' : !IS_MOBILE;
+  $('mirrorChk').checked = mirror;
+  video.classList.toggle('mirror', mirror);
+
+  prefs.cameraOn = true; savePrefs();
+  camMsg('');
+  updateCamToggle();
+  track.addEventListener('ended', () => { stopCamera(); camMsg('鏡頭已中斷，請按「開啟鏡頭」。'); });
+  const gen = ++scanGen;
+  scanTimer = setTimeout(() => scanFrame(gen), 200);
+}
+
+function stopCamera() {
+  scanGen++;
+  clearTimeout(scanTimer);
+  scanTimer = null;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+  video.srcObject = null;
+  $('aimBox').classList.add('hidden');
+  $('camInfo').textContent = '';
+  updateCamToggle();
+}
+function updateCamToggle() { $('camToggle').textContent = stream ? '關閉鏡頭' : '開啟鏡頭'; }
+
+// 對準框（與解碼區域）在影像中的位置；padded=true 時稍微放大，給一點容錯
+function roiRect(vw, vh, padded) {
+  let w = vw * CONFIG.camera.aimWidthRatio;
+  let h = Math.min(vh * 0.4, w * 0.42);
+  if (padded) { w = Math.min(vw, w * 1.12); h = Math.min(vh, h * 1.3); }
+  return { x: Math.round((vw - w) / 2), y: Math.round((vh - h) / 2), w: Math.round(w), h: Math.round(h) };
+}
+function layoutAim() {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const box = $('aimBox');
+  if (!stream || !vw) { box.classList.add('hidden'); return; }
+  // 手機：框的比例跟著影像（直拿的影像最多顯示成 4:3，只裁掉上下，對準框一定在畫面內）
+  const ar = Math.max(vw / vh, 4 / 3).toFixed(4);
+  const wrap = $('videoWrap');
+  if (wrap.style.getPropertyValue('--cam-ar') !== ar) wrap.style.setProperty('--cam-ar', ar);
+  video.style.objectFit = '';
+  let cover = getComputedStyle(video).objectFit === 'cover';
+  const cw = video.clientWidth, ch = video.clientHeight;
+  const r = roiRect(vw, vh, false);
+  // 高度被螢幕限制住時，裁切可能把對準框切掉；這時改成完整顯示，兩側留黑邊
+  if (cover && r.h * Math.max(cw / vw, ch / vh) > ch - 8) { cover = false; video.style.objectFit = 'contain'; }
+  const scale = cover ? Math.max(cw / vw, ch / vh) : Math.min(cw / vw, ch / vh);
+  const ox = (cw - vw * scale) / 2, oy = (ch - vh * scale) / 2;
+  Object.assign(box.style, {
+    left: ox + r.x * scale + 'px', top: oy + r.y * scale + 'px',
+    width: r.w * scale + 'px', height: r.h * scale + 'px',
+  });
+  box.classList.toggle('nolabel', oy + r.y * scale < 32);  // 框上方放不下提示字就不顯示
+  box.classList.remove('hidden');
+}
+video.addEventListener('loadedmetadata', layoutAim);
+video.addEventListener('resize', layoutAim);
+window.addEventListener('resize', layoutAim);
+// 鏡頭區寬高變了（版面換行、捲軸出現等不會觸發 resize 的情況）也要重新對齊對準框
+if (typeof ResizeObserver === 'function') new ResizeObserver(() => layoutAim()).observe($('videoWrap'));
+
+// 把對準框內的影像畫到 canvas；deg ≠ 0 時以框中心旋轉，用來矯正拿歪的卡片
+function drawRoi(r, deg) {
+  ctx2d.setTransform(1, 0, 0, 1, 0, 0);
+  if (!deg) { ctx2d.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h); return; }
+  ctx2d.fillStyle = '#808080';
+  ctx2d.fillRect(0, 0, r.w, r.h);
+  ctx2d.translate(r.w / 2, r.h / 2);
+  ctx2d.rotate(deg * Math.PI / 180);
+  ctx2d.drawImage(video, -(r.x + r.w / 2), -(r.y + r.h / 2));
+  ctx2d.setTransform(1, 0, 0, 1, 0, 0);
+}
+
+// 水平放大 2 倍、垂直壓成 1/3：條碼是直條，垂直平均可降雜訊，水平放大讓細條的邊界量得更準（對遠、小、暗的條碼有幫助）
+function drawStretched(r) {
+  const w = r.w * 2, h = Math.max(8, Math.floor(r.h / 3));
+  if (canvas2.width !== w || canvas2.height !== h) { canvas2.width = w; canvas2.height = h; }
+  ctx2.imageSmoothingEnabled = true;
+  ctx2.imageSmoothingQuality = 'high';
+  ctx2.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, w, h);
+}
+
+// 定焦鏡頭拿近時細條會糊成淡灰色：先垂直平均 5 列降雜訊（條碼是直條，不會變糊），
+// 再做水平的反銳利化遮罩：p + amount × (p − 左右 radius 範圍的平均)，把細條的對比拉回來
+function sharpenImage(img, radius, amount) {
+  const { data, width: w, height: h } = img;
+  const g = new Float32Array(w * h);
+  for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = (data[j] * 77 + data[j + 1] * 150 + data[j + 2] * 29) / 256;
+  const v = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const y0 = Math.max(0, y - 2), y1 = Math.min(h - 1, y + 2), cnt = y1 - y0 + 1;
+    for (let x = 0; x < w; x++) { let s = 0; for (let yy = y0; yy <= y1; yy++) s += g[yy * w + x]; v[y * w + x] = s / cnt; }
+  }
+  const out = new ImageData(w, h), od = out.data, n = 2 * radius + 1;
+  for (let y = 0; y < h; y++) {
+    const o = y * w;
+    let s = 0;
+    for (let x = -radius; x <= radius; x++) s += v[o + Math.min(w - 1, Math.max(0, x))];
+    for (let x = 0; x < w; x++) {
+      const p = v[o + x], j = (o + x) * 4;
+      od[j] = od[j + 1] = od[j + 2] = p + amount * (p - s / n);   // Uint8ClampedArray 會自動夾在 0–255
+      od[j + 3] = 255;
+      s += v[o + Math.min(w - 1, x + radius + 1)] - v[o + Math.max(0, x - radius)];
+    }
+  }
+  return out;
+}
+
+function toGray(img) {
+  const d = img.data, g = new Uint8Array(img.width * img.height);
+  for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = (d[j] * 77 + d[j + 1] * 150 + d[j + 2] * 29) >> 8;
+  return g;
+}
+
+/* BLUR-C128 START */
+/* 模糊容忍的 Code 128 解碼器（以合成比對取代二值化）
+ * 1. 找條碼：逐列（每列平均上下幾行）找「亮暗交替很密集」的區段。
+ * 2. 由第一條與最後一條黑條的位置，加上 Code 128 的結構（每符號 11 模組、終止碼 13 模組）推出可能的符號數 N 與模組寬。
+ * 3. 對每個符號，把候選圖樣以高斯模糊「畫出來」，與實際亮度曲線做正規化相關（NCC），取最像的。
+ * 4. 起始碼、終止碼都要對得上，最後用 mod 103 檢查碼驗證。
+ */
+// 寫成獨立函式，網頁可以用 makeC128.toString() 把它放進 Web Worker 執行
+function makeC128() {
+  const PAT = [[2,1,2,2,2,2],[2,2,2,1,2,2],[2,2,2,2,2,1],[1,2,1,2,2,3],[1,2,1,3,2,2],[1,3,1,2,2,2],[1,2,2,2,1,3],[1,2,2,3,1,2],[1,3,2,2,1,2],[2,2,1,2,1,3],[2,2,1,3,1,2],[2,3,1,2,1,2],[1,1,2,2,3,2],[1,2,2,1,3,2],[1,2,2,2,3,1],[1,1,3,2,2,2],[1,2,3,1,2,2],[1,2,3,2,2,1],[2,2,3,2,1,1],[2,2,1,1,3,2],[2,2,1,2,3,1],[2,1,3,2,1,2],[2,2,3,1,1,2],[3,1,2,1,3,1],[3,1,1,2,2,2],[3,2,1,1,2,2],[3,2,1,2,2,1],[3,1,2,2,1,2],[3,2,2,1,1,2],[3,2,2,2,1,1],[2,1,2,1,2,3],[2,1,2,3,2,1],[2,3,2,1,2,1],[1,1,1,3,2,3],[1,3,1,1,2,3],[1,3,1,3,2,1],[1,1,2,3,1,3],[1,3,2,1,1,3],[1,3,2,3,1,1],[2,1,1,3,1,3],[2,3,1,1,1,3],[2,3,1,3,1,1],[1,1,2,1,3,3],[1,1,2,3,3,1],[1,3,2,1,3,1],[1,1,3,1,2,3],[1,1,3,3,2,1],[1,3,3,1,2,1],[3,1,3,1,2,1],[2,1,1,3,3,1],[2,3,1,1,3,1],[2,1,3,1,1,3],[2,1,3,3,1,1],[2,1,3,1,3,1],[3,1,1,1,2,3],[3,1,1,3,2,1],[3,3,1,1,2,1],[3,1,2,1,1,3],[3,1,2,3,1,1],[3,3,2,1,1,1],[3,1,4,1,1,1],[2,2,1,4,1,1],[4,3,1,1,1,1],[1,1,1,2,2,4],[1,1,1,4,2,2],[1,2,1,1,2,4],[1,2,1,4,2,1],[1,4,1,1,2,2],[1,4,1,2,2,1],[1,1,2,2,1,4],[1,1,2,4,1,2],[1,2,2,1,1,4],[1,2,2,4,1,1],[1,4,2,1,1,2],[1,4,2,2,1,1],[2,4,1,2,1,1],[2,2,1,1,1,4],[4,1,3,1,1,1],[2,4,1,1,1,2],[1,3,4,1,1,1],[1,1,1,2,4,2],[1,2,1,1,4,2],[1,2,1,2,4,1],[1,1,4,2,1,2],[1,2,4,1,1,2],[1,2,4,2,1,1],[4,1,1,2,1,2],[4,2,1,1,1,2],[4,2,1,2,1,1],[2,1,2,1,4,1],[2,1,4,1,2,1],[4,1,2,1,2,1],[1,1,1,1,4,3],[1,1,1,3,4,1],[1,3,1,1,4,1],[1,1,4,1,1,3],[1,1,4,3,1,1],[4,1,1,1,1,3],[4,1,1,3,1,1],[1,1,3,1,4,1],[1,1,4,1,3,1],[3,1,1,1,4,1],[4,1,1,1,3,1],[2,1,1,4,1,2],[2,1,1,2,1,4],[2,1,1,2,3,2],[2,3,3,1,1,1,2]];
+  const STARTS = [103, 104, 105], STOP = 106;
+  // 時間上限：超過就放棄這一格（雜亂的畫面可能要試很多種假設）
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  let deadline = Infinity;
+
+  // 常態分佈累積函數查表
+  function erf(x) {
+    const s = x < 0 ? -1 : 1; x = Math.abs(x);
+    const t = 1 / (1 + 0.3275911 * x);
+    return s * (1 - (((((1.061405429 * t - 1.453152027) * t) + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-x * x));
+  }
+  const LR = 6, LN = 4001, LK = (LN - 1) / (2 * LR), LUT = new Float32Array(LN);
+  for (let i = 0; i < LN; i++) LUT[i] = 0.5 * (1 + erf((-LR + i / LK) / Math.SQRT2));
+  function phi(z) {
+    if (z <= -LR) return 0;
+    if (z >= LR) return 1;
+    const f = (z + LR) * LK, i = f | 0;
+    return LUT[i] + (LUT[i + 1] - LUT[i]) * (f - i);
+  }
+
+  // 把模糊後的黑條模板與 P[i0 .. i0+n) 做 NCC。bars = [左, 右, 左, 右, ...]（像素座標，像素 i 的中心在 i+0.5）
+  function ncc(P, i0, n, bars, nb, sigma) {
+    i0 = Math.floor(i0); n = Math.ceil(n);
+    if (i0 < 0) { n += i0; i0 = 0; }
+    if (i0 + n > P.length) n = P.length - i0;
+    if (n < 8) return -1;
+    const inv = 1 / sigma, reach = 6 * sigma;
+    let sp = 0, st = 0, spp = 0, stt = 0, spt = 0;
+    for (let i = 0; i < n; i++) {
+      const x = i0 + i + 0.5;
+      let v = 1;
+      for (let k = 0; k < nb; k++) {
+        const a = bars[2 * k], b = bars[2 * k + 1];
+        if (b < x - reach || a > x + reach) continue;
+        v -= phi((x - a) * inv) - phi((x - b) * inv);
+      }
+      const p = P[i0 + i];
+      sp += p; st += v; spp += p * p; stt += v * v; spt += p * v;
+    }
+    const vp = spp - sp * sp / n, vt = stt - st * st / n;
+    if (vp <= 1e-6 || vt <= 1e-9) return -1;
+    return (spt - sp * st / n) / Math.sqrt(vp * vt);
+  }
+
+  // 把一個符號的黑條加進 bars；beta = 墨水擴散（黑條變寬為正）
+  function put(bars, nb, pat, s, m, beta) {
+    let x = s;
+    for (let j = 0; j < pat.length; j++) {
+      const w = pat[j] * m;
+      if (!(j & 1)) { bars[2 * nb] = x - beta / 2; bars[2 * nb + 1] = x + w + beta / 2; nb++; }
+      x += w;
+    }
+    return nb;
+  }
+  // 下一個符號一定以黑條開頭：放一條 1 模組寬的黑條當右側的近似脈絡
+  function putNext(bars, nb, s, m, beta) { bars[2 * nb] = s - beta / 2; bars[2 * nb + 1] = s + m + beta / 2; return nb + 1; }
+
+  // 門檻：實測正確讀取時每個符號的相似度都在 0.85 以上，雜訊勉強湊出來的多半在 0.6～0.8
+  const MIN_START = 0.75, MIN_SYM = 0.7, MIN_STOP = 0.7, MIN_MEAN = 0.85;
+
+  // 在 pe 附近找終止碼（後面接空白區），回傳最高相似度
+  function stopScore(P, bars, pe, m, sigma, beta, range) {
+    let best = -2;
+    for (let d = -range; d <= range; d += 0.5) {
+      const nb = put(bars, 0, PAT[STOP], pe + d, m, beta);
+      const v = ncc(P, pe + d - m, 17 * m, bars, nb, sigma);
+      if (v > best) best = v;
+    }
+    return best;
+  }
+
+  function decodeHyp(P, L0, R0, N) {
+    let m = (R0 - L0) / (11 * N + 11);
+    const bars = new Float64Array(64);
+    let nb;
+    // 起始碼：先粗找位置與種類
+    const s0 = L0 - m;
+    let st = { c: -2 };
+    for (const sv of STARTS) {
+      for (let s = s0 - 1.5 * m; s <= s0 + 1.5 * m; s += 0.5) {
+        nb = put(bars, 0, PAT[sv], s, m, 0); nb = putNext(bars, nb, s + 11 * m, m, 0);
+        const c = ncc(P, s - 3 * m, 15 * m, bars, nb, 0.6 * m);
+        if (c > st.c) st = { c, sv, s };
+      }
+    }
+    if (st.c < MIN_START - 0.15) return null;
+    // 預測位置上要有終止碼：雜訊多半在這裡就被排除，省下後面的細調與逐符號比對
+    if (stopScore(P, bars, st.s + 11 * N * m, m, 0.6 * m, 0, 1.5 * m) < MIN_STOP - 0.2) return null;
+    // 細調位置、模組寬、模糊程度、墨水擴散
+    let best = { c: -2 };
+    for (let ds = -1; ds <= 1; ds += 0.5) for (const km of [0.97, 1, 1.03]) {
+      const mm = m * km;
+      for (const ks of [0.3, 0.5, 0.75, 1.0]) for (const kb of [-0.25, 0, 0.25]) {
+        const s = st.s + ds, beta = kb * mm;
+        nb = put(bars, 0, PAT[st.sv], s, mm, beta); nb = putNext(bars, nb, s + 11 * mm, mm, beta);
+        const c = ncc(P, s - 3 * mm, 15 * mm, bars, nb, ks * mm);
+        if (c > best.c) best = { c, s, mm, sigma: ks * mm, beta };
+      }
+    }
+    if (best.c < MIN_START) return null;
+    const sigma = best.sigma, beta = best.beta;
+    m = best.mm;
+    if (stopScore(P, bars, best.s + 11 * N * m, m, sigma, beta, 1.5 * m) < MIN_STOP) return null;
+    const vals = [st.sv], scores = [best.c];
+    let prevPat = PAT[st.sv], prevS = best.s, prevM = m, pos = best.s + 11 * m;
+
+    // 資料符號與檢查碼
+    const cand = new Float64Array(103);
+    for (let k = 1; k < N; k++) {
+      if (now() > deadline) return null;
+      for (let c = 0; c < 103; c++) {
+        nb = put(bars, 0, prevPat, prevS, prevM, beta); nb = put(bars, nb, PAT[c], pos, m, beta); nb = putNext(bars, nb, pos + 11 * m, m, beta);
+        cand[c] = ncc(P, pos - 2 * m, 14 * m, bars, nb, sigma);
+      }
+      const top = Array.from(cand.keys()).sort((a, b) => cand[b] - cand[a]).slice(0, 4);
+      let sb = { c: -2 };
+      for (const c of top) for (let d = -1; d <= 1; d += 0.5) for (const km of [0.97, 0.985, 1, 1.015, 1.03]) {
+        const mm = m * km, s = pos + d;
+        nb = put(bars, 0, prevPat, prevS, prevM, beta); nb = put(bars, nb, PAT[c], s, mm, beta); nb = putNext(bars, nb, s + 11 * mm, mm, beta);
+        const v = ncc(P, s - 2 * m, 14 * m, bars, nb, sigma);
+        if (v > sb.c) sb = { c: v, val: c, s, mm };
+      }
+      if (sb.c < MIN_SYM) return null;
+      vals.push(sb.val); scores.push(sb.c);
+      prevPat = PAT[sb.val]; prevS = sb.s; prevM = sb.mm;
+      m = 0.5 * m + 0.5 * sb.mm;
+      pos = sb.s + 11 * sb.mm;
+    }
+    // 終止碼（後面要接空白區）
+    let sp = { c: -2 };
+    for (let d = -1; d <= 1; d += 0.5) for (const km of [0.97, 0.985, 1, 1.015, 1.03]) {
+      const mm = m * km, s = pos + d;
+      nb = put(bars, 0, prevPat, prevS, prevM, beta); nb = put(bars, nb, PAT[STOP], s, mm, beta);
+      const v = ncc(P, s - 2 * m, 18 * mm, bars, nb, sigma);
+      if (v > sp.c) sp = { c: v };
+    }
+    if (sp.c < MIN_STOP) return null;
+    scores.push(sp.c);
+
+    // 檢查碼
+    let sum = vals[0];
+    for (let i = 1; i < vals.length - 1; i++) sum += i * vals[i];
+    if (sum % 103 !== vals[vals.length - 1]) return null;
+    const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+    if (mean < MIN_MEAN) return null;
+    const text = valuesToText(vals);
+    if (!text) return null;
+    return { text, min: Math.min(...scores), mean, N, m, sigma };
+  }
+
+  function valuesToText(vals) {
+    let set = { 103: 'A', 104: 'B', 105: 'C' }[vals[0]], shift = false, out = '';
+    for (let i = 1; i < vals.length - 1; i++) {
+      const v = vals[i];
+      const cur = shift ? (set === 'A' ? 'B' : 'A') : set;
+      shift = false;
+      if (cur === 'C') {
+        if (v < 100) out += (v < 10 ? '0' : '') + v;
+        else if (v === 100) set = 'B';
+        else if (v === 101) set = 'A';
+      } else if (v < 96) {
+        out += String.fromCharCode(cur === 'A' && v >= 64 ? v - 64 : 32 + v);
+      } else if (v === 98) shift = true;
+      else if (v === 99) set = 'C';
+      else if (v === 100 && cur === 'A') set = 'B';
+      else if (v === 101 && cur === 'B') set = 'A';
+    }
+    return out;
+  }
+
+  // 一列亮度曲線上的極值（遲滯門檻），回傳 [{x, min:true/false}]
+  function extrema(P, T) {
+    const out = [];
+    let dir = 1, ei = 0, ev = P[0];
+    for (let x = 1; x < P.length; x++) {
+      const p = P[x];
+      if (dir > 0) {
+        if (p > ev) { ev = p; ei = x; } else if (ev - p > T) { out.push({ x: ei + 0.5, min: false }); dir = -1; ev = p; ei = x; }
+      } else {
+        if (p < ev) { ev = p; ei = x; } else if (p - ev > T) { out.push({ x: ei + 0.5, min: true }); dir = 1; ev = p; ei = x; }
+      }
+    }
+    return out;
+  }
+  const median = a => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[s.length >> 1] : 0; };
+
+  // 在一列的極值裡找「亮暗交替密集、兩側有空白」的區段
+  function runsOf(ex) {
+    const runs = [];
+    let piece = [];
+    const flush = () => {
+      if (piece.length < 16) { piece = []; return; }
+      const gaps = []; for (let i = 1; i < piece.length; i++) gaps.push(piece[i].x - piece[i - 1].x);
+      const g = median(gaps);
+      let cur = [piece[0]];
+      for (let i = 1; i <= piece.length; i++) {
+        if (i === piece.length || piece[i].x - piece[i - 1].x > 3.2 * g) {
+          while (cur.length && !cur[0].min) cur.shift();
+          while (cur.length && !cur[cur.length - 1].min) cur.pop();
+          if (cur.length >= 16) runs.push({ L0: cur[0].x, R0: cur[cur.length - 1].x, count: cur.length, g, xs: cur.map(e => e.x), mins: cur.filter(e => e.min).map(e => e.x) });
+          cur = [];
+        }
+        if (i < piece.length) cur.push(piece[i]);
+      }
+      piece = [];
+    };
+    for (let i = 0; i < ex.length; i++) {
+      if (piece.length && ex[i].x - piece[piece.length - 1].x > 60) flush();
+      piece.push(ex[i]);
+    }
+    flush();
+    return runs;
+  }
+
+  // 條碼旁邊常有印刷字（例如學生證條碼右邊的「1」）混進區段，所以兩端各試幾條黑條當起點／終點
+  function decodeProfile(P, run) {
+    const m0 = run.g / 1.83;
+    const hyps = [];
+    const Ls = run.mins.slice(0, 3), Rs = run.mins.slice(-4);
+    for (const L of Ls) for (const R of Rs) {
+      if (R - L < 30) continue;
+      const count = run.xs.filter(x => x >= L && x <= R).length;
+      for (let N = 3; N <= 40; N++) {
+        const m = (R - L) / (11 * N + 11);
+        if (m < 1.8 || m > 20 || m < 0.55 * m0 || m > 1.6 * m0) continue;
+        const elems = 6 * N + 7;
+        if (count > elems + 4 || count < 0.45 * elems) continue;
+        hyps.push({ L, R, N, d: Math.abs(Math.log(m / m0)) + 0.02 * (Ls.indexOf(L) + Rs.length - 1 - Rs.indexOf(R)) });
+      }
+    }
+    hyps.sort((a, b) => a.d - b.d);
+    // 不採用「第一個通過的」，而是比較所有通過的假設取最像的；非常像（≥0.92）就直接採用
+    let best = null;
+    for (const h of hyps.slice(0, 24)) {
+      if (now() > deadline) break;
+      const r = decodeHyp(P, h.L, h.R, h.N);
+      if (r && (!best || r.mean > best.mean)) best = r;
+      if (best && best.mean >= 0.92) break;
+    }
+    return best;
+  }
+
+  // gray：Uint8 / Float32 灰階，w×h。opts.maxCandidates：最多嘗試幾個候選區段
+  // 平均 y-half .. y+half 列成一條亮度曲線
+  function rowProfile(gray, w, h, y, half, P) {
+    P.fill(0);
+    const y0 = Math.max(0, y - half), y1 = Math.min(h - 1, y + half);
+    for (let yy = y0; yy <= y1; yy++) { const o = yy * w; for (let x = 0; x < w; x++) P[x] += gray[o + x]; }
+    for (let x = 0; x < w; x++) P[x] /= y1 - y0 + 1;
+    return P;
+  }
+  // 條碼兩側應是亮的空白區：比較區段外側與區段內亮點的亮度
+  function quietZoneOk(P, ex, run) {
+    const inner = ex.filter(e => !e.min && e.x > run.L0 && e.x < run.R0).map(e => P[Math.floor(e.x)]);
+    if (inner.length < 4) return false;
+    const white = median(inner);
+    const lo = P.reduce((a, b) => Math.min(a, b), 1e9);
+    const zone = (a, b) => {
+      a = Math.max(0, Math.floor(a)); b = Math.min(P.length, Math.ceil(b));
+      if (b - a < 3) return true;   // 碰到畫面邊緣就不判斷
+      let s = 0; for (let x = a; x < b; x++) s += P[x];
+      return s / (b - a) > lo + 0.7 * (white - lo);
+    };
+    return zone(run.L0 - 6 * run.g, run.L0 - 1.5 * run.g) && zone(run.R0 + 1.5 * run.g, run.R0 + 6 * run.g);
+  }
+
+  function decode(gray, w, h, opts = {}) {
+    const maxCand = opts.maxCandidates || 6, step = 4;
+    deadline = opts.budgetMs ? now() + opts.budgetMs : Infinity;
+    const cands = [];
+    const P = new Float32Array(w);
+    for (let y = 3; y < h - 3; y += step) {
+      rowProfile(gray, w, h, y, 3, P);
+      let lo = 1e9, hi = -1e9;
+      for (let x = 0; x < w; x++) { if (P[x] < lo) lo = P[x]; if (P[x] > hi) hi = P[x]; }
+      // 估計這一列的雜訊（相鄰像素差的中位數），起伏要明顯大於雜訊才算
+      const diffs = new Float32Array(w - 1);
+      for (let x = 0; x < w - 1; x++) diffs[x] = Math.abs(P[x + 1] - P[x]);
+      const noise = median(Array.from(diffs)) * 1.05;
+      const ex = extrema(P, Math.max(3, 4 * noise, 0.06 * (hi - lo)));
+      // 間距太小（模組寬 < 1.8 px）不可能是條碼，不要佔用候選名額
+      for (const r of runsOf(ex)) if (r.g / 1.83 * 1.6 >= 1.8 && quietZoneOk(P, ex, r)) cands.push({ ...r, y });
+    }
+    cands.sort((a, b) => b.count - a.count);
+    const chosen = [];
+    for (const c of cands) {
+      if (chosen.some(o => Math.abs(o.y - c.y) < 10 && Math.min(o.R0, c.R0) - Math.max(o.L0, c.L0) > 0.5 * (c.R0 - c.L0))) continue;
+      chosen.push(c);
+      if (chosen.length >= maxCand) break;
+    }
+    for (const c of chosen) {
+      if (now() > deadline) break;
+      rowProfile(gray, w, h, c.y, 6, P);
+      const r = decodeProfile(P, c);
+      if (r) return { ...r, y: c.y, reversed: false };
+      const Q = P.slice().reverse();
+      const flip = a => a.map(x => w - x).reverse();
+      const rr = decodeProfile(Q, { ...c, L0: w - c.R0, R0: w - c.L0, xs: flip(c.xs), mins: flip(c.mins) });
+      if (rr) return { ...rr, y: c.y, reversed: true };
+    }
+    return null;
+  }
+
+  return { decode, PAT };
+}
+const C128 = makeC128();
+/* BLUR-C128 END */
+
+// 模糊解碼器在 Web Worker（背景執行緒）裡跑，畫面和掃描槍輸入不會被卡住；不支援時退回主執行緒
+let blurWorker = null, blurReqId = 0;
+const blurPending = new Map();
+function blurDecode(gray, w, h) {
+  if (blurWorker === null) {
+    try {
+      const src = `const C128 = (${makeC128.toString()})();
+self.onmessage = e => {
+  const { id, gray, w, h } = e.data;
+  let r = null;
+  try { r = C128.decode(gray, w, h, { budgetMs: 150 }); } catch (err) {}
+  self.postMessage({ id, r });
+};`;
+      blurWorker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      blurWorker.onmessage = e => {
+        const done = blurPending.get(e.data.id);
+        if (done) { blurPending.delete(e.data.id); done(e.data.r); }
+      };
+      blurWorker.onerror = () => { blurWorker = false; for (const done of blurPending.values()) done(null); blurPending.clear(); };
+    } catch (e) {
+      blurWorker = false;
+    }
+  }
+  if (!blurWorker) return Promise.resolve(C128.decode(gray, w, h, { budgetMs: 80 }));
+  return new Promise(resolve => {
+    const id = ++blurReqId;
+    blurPending.set(id, resolve);
+    blurWorker.postMessage({ id, gray, w, h }, [gray.buffer]);
+  });
+}
+
+// 額外嘗試的輪替順序：偶數格試傾斜角度，奇數格試影像增強；模糊解碼器最有效，所以排比較多次
+const ENHANCE_PASSES = [{ blur: true }, { sharpen: [3, 1.5] }, { blur: true }, { sharpen: [5, 2] }, { blur: true }, { stretch: true }];
+function nextExtraPass() {
+  const k = passIdx++;
+  const tilts = CONFIG.camera.tiltAngles;
+  if (k % 2 === 0 && tilts.length) return { angle: tilts[(k / 2) % tilts.length] };
+  return ENHANCE_PASSES[Math.floor(k / 2) % ENHANCE_PASSES.length];
+}
+
+async function scanFrame(gen) {
+  if (gen !== scanGen || !stream) return;
+  if (video.readyState >= 2 && video.videoWidth && !document.hidden) {
+    const r = roiRect(video.videoWidth, video.videoHeight, true);
+    if (canvas.width !== r.w || canvas.height !== r.h) { canvas.width = r.w; canvas.height = r.h; layoutAim(); }
+    // 每格先試正放，再輪流多試一種：傾斜角度，或影像增強（銳利化／水平放大），兩類交錯
+    const passes = engine.tilt ? [{ angle: 0 }, nextExtraPass()] : [{ angle: 0 }];
+    const t0 = performance.now();
+    let hit = null, hitPass = null;
+    for (const p of passes) {
+      try {
+        if (p.stretch) { drawStretched(r); hit = await engine.decode(canvas2, ctx2); }
+        else if (p.sharpen) { drawRoi(r, 0); hit = await engine.decodeImage(sharpenImage(ctx2d.getImageData(0, 0, r.w, r.h), ...p.sharpen)); }
+        else if (p.blur) {
+          if (!CONFIG.camera.formats.includes('Code128')) continue;
+          drawRoi(r, 0);
+          const res = await blurDecode(toGray(ctx2d.getImageData(0, 0, r.w, r.h)), r.w, r.h);
+          hit = res ? { text: res.text, format: 'Code128', confirm: true } : null;
+        }
+        else { drawRoi(r, p.angle); hit = await engine.decode(canvas, ctx2d); }
+      } catch (e) { console.warn('decode error', e); }
+      if (gen !== scanGen) return;
+      if (hit) { hitPass = p; break; }
+    }
+    perf.frames++; perf.totalFrames++; perf.ms += performance.now() - t0;
+    if (hit) onCameraDecode(hit.text, hit.format + (hitPass.blur ? '（模糊解碼）' : hitPass.stretch ? '（放大）' : hitPass.sharpen ? '（銳利化）' : hitPass.angle ? `（傾斜 ${hitPass.angle}°）` : ''), !!hit.confirm);
+  }
+  const elapsed = performance.now() - perf.since;
+  if (elapsed > 1000 && stream) {
+    const track = stream.getVideoTracks()[0];
+    const st = track && track.getSettings ? track.getSettings() : {};
+    perf.text = [`解析度 ${video.videoWidth}×${video.videoHeight}${capsInfo}`, st.frameRate && `${Math.round(st.frameRate)} fps`, focusInfo].filter(Boolean).join('・');
+    $('camInfo').textContent = perf.text;
+    $('tPerf').textContent = `${perf.text}・引擎 ${engine.name}・每格解碼 ${perf.frames ? (perf.ms / perf.frames).toFixed(0) : '-'} ms・每秒解碼 ${(perf.frames * 1000 / elapsed).toFixed(1)} 格`;
+    perf.frames = 0; perf.ms = 0; perf.since = performance.now();
+  }
+  if (gen === scanGen && stream) scanTimer = setTimeout(() => scanFrame(gen), CONFIG.camera.scanIntervalMs);
+}
+
+// 模糊解碼器的結果要在 2.5 秒內被再讀到一次同樣內容（任一種方式）才採用，多一層防誤讀
+const unconfirmed = new Map();
+function onCameraDecode(text, format, needsConfirm) {
+  const t = Date.now();
+  // 冷卻：同一條碼持續被讀到時，從「最後一次讀到」起算 cooldownMs 內都不重複觸發
+  const repeat = text === lastCode && t - lastCodeAt < CONFIG.camera.cooldownMs;
+  if (needsConfirm && !repeat) {
+    const seen = unconfirmed.get(text);
+    if (!seen || t - seen > 2500) { unconfirmed.set(text, t); return; }
+  }
+  unconfirmed.delete(text);
+  lastCode = text;
+  lastCodeAt = t;
+  if (mode === 'test') { testOnScan(text, format, 'camera', repeat); return; }
+  if (!repeat) handleScan(text, 'camera', format);
+}
+
+$('camToggle').addEventListener('click', () => {
+  if (stream) { stopCamera(); camMsg('鏡頭已關閉'); prefs.cameraOn = false; savePrefs(); }
+  else startCamera();
+});
+camSelect.addEventListener('change', () => {
+  prefs.camera = camSelect.value; savePrefs();
+  camSelect.blur();
+  startCamera();
+});
+$('mirrorChk').addEventListener('change', e => video.classList.toggle('mirror', e.target.checked));
+
+/* ---------------- 測試模式 ---------------- */
+const test = { running: false, t0: 0, frames0: 0, hits: 0, lastRaw: null, attempts: [], timeout: null, raf: 0 };
+
+function testStart() {
+  if (test.running) { testFinish(false, null, null); return; }
+  test.running = true;
+  test.t0 = performance.now();
+  test.frames0 = perf.totalFrames;
+  $('tStartBtn').textContent = '停止（空白鍵）';
+  $('tTimer').classList.add('running');
+  const tick = () => {
+    if (!test.running) return;
+    const sec = (performance.now() - test.t0) / 1000;
+    $('tTimer').textContent = sec.toFixed(1) + ' 秒';
+    if (sec >= CONFIG.testTimeoutSec) { testFinish(false, null, null); return; }
+    test.raf = requestAnimationFrame(tick);
+  };
+  tick();
+}
+function testFinish(ok, raw, format) {
+  if (!test.running) return;
+  test.running = false;
+  cancelAnimationFrame(test.raf);
+  const sec = (performance.now() - test.t0) / 1000;
+  test.attempts.push({ ok, sec, frames: perf.totalFrames - test.frames0, format, raw });
+  $('tTimer').textContent = sec.toFixed(1) + ' 秒';
+  $('tTimer').classList.remove('running');
+  $('tStartBtn').textContent = '開始計時（空白鍵）';
+  if (!ok) beep('fail');
+  renderTestStats();
+}
+function renderTestStats() {
+  const a = test.attempts;
+  const ok = a.filter(x => x.ok).map(x => x.sec).sort((x, y) => x - y);
+  if (!a.length) { $('tStats').textContent = '尚未測試。按「開始計時」後把條碼對準框內。'; }
+  else {
+    const avg = ok.length ? ok.reduce((s, x) => s + x, 0) / ok.length : 0;
+    const med = ok.length ? (ok.length % 2 ? ok[(ok.length - 1) / 2] : (ok[ok.length / 2 - 1] + ok[ok.length / 2]) / 2) : 0;
+    $('tStats').textContent = `成功 ${ok.length} / ${a.length} 次（${Math.round(ok.length / a.length * 100)}%）`
+      + (ok.length ? `・平均 ${avg.toFixed(2)} 秒・中位數 ${med.toFixed(2)} 秒・最快 ${ok[0].toFixed(2)}・最慢 ${ok[ok.length - 1].toFixed(2)}` : '');
+  }
+  const body = $('tBody');
+  body.innerHTML = '';
+  a.slice().reverse().forEach((x, i) => {
+    const tr = document.createElement('tr');
+    const cells = [a.length - i, x.ok ? '成功' : `逾時/停止`, x.sec.toFixed(2), x.frames, x.format || '—', x.raw == null ? '—' : visible(x.raw)];
+    cells.forEach((c, j) => { const td = document.createElement('td'); td.textContent = c; if (j === 5) td.className = 'raw mono'; tr.appendChild(td); });
+    body.appendChild(tr);
+  });
+}
+function testOnScan(raw, format, source, repeat) {
+  if (!repeat || raw !== test.lastRaw) test.hits = 0;
+  test.hits++;
+  test.lastRaw = raw;
+  const sid = CONFIG.normalize(raw);
+  const fmt = format || (source === 'scanner' ? '（掃描槍，無格式資訊）' : '（手動輸入）');
+  $('tRaw').textContent = visible(raw);
+  $('tLen').textContent = `${raw.length} 字元`;
+  $('tFormat').textContent = fmt;
+  $('tMatch').textContent = CONFIG.idPattern.test(sid) ? `✓ 符合（整理後：${sid}）` : `✗ 不符合 ${CONFIG.idPattern}（整理後：${sid}）`;
+  $('tHits').textContent = test.hits;
+  const live = $('tLive');
+  live.classList.add('pulse');
+  requestAnimationFrame(() => requestAnimationFrame(() => live.classList.remove('pulse')));
+  if (test.running) { beep('ok'); testFinish(true, raw, fmt); }
+  else if (!repeat) beep('test');
+}
+$('tStartBtn').addEventListener('click', testStart);
+$('tResetBtn').addEventListener('click', () => {
+  if (test.running) { test.running = false; cancelAnimationFrame(test.raf); $('tTimer').classList.remove('running'); $('tStartBtn').textContent = '開始計時（空白鍵）'; }
+  test.attempts = []; $('tTimer').textContent = '0.0 秒'; renderTestStats();
+});
+// 存下鏡頭的原始影像（不是螢幕截圖），用來離線分析讀不到的原因
+function saveFrame() {
+  if (!stream || !video.videoWidth) { alert('鏡頭沒有開啟。'); return; }
+  const c = document.createElement('canvas');
+  c.width = video.videoWidth; c.height = video.videoHeight;
+  c.getContext('2d').drawImage(video, 0, 0);
+  const d = new Date();
+  const name = `鏡頭畫面_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}_${d.getMilliseconds()}.png`;
+  c.toBlob(b => { if (b) downloadBlob(name, b); }, 'image/png');
+}
+$('tSaveBtn').addEventListener('click', saveFrame);
+
+document.addEventListener('keydown', e => {
+  if (mode !== 'test' || (e.key !== ' ' && e.key.toLowerCase() !== 's')) return;
+  const a = document.activeElement;
+  if (a && a !== scannerInput && a !== document.body && a.matches('input, select, textarea')) return;
+  e.preventDefault();
+  if (e.key === ' ') testStart(); else saveFrame();
+});
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
+  $('checkinView').classList.toggle('hidden', m !== 'checkin');
+  $('testView').classList.toggle('hidden', m !== 'test');
+  $('bannerTest').classList.toggle('hidden', m !== 'test');
+  lastCode = null;
+}
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+
+/* ---------------- 畫面更新 ---------------- */
+function render() {
+  const d = now();
+  $('clock').textContent = hms(d);
+  const s = currentSession(d);
+  const nameEl = $('sessionName');
+  if (s) {
+    const w = windowOf(s);
+    nameEl.textContent = s.name;
+    nameEl.classList.remove('off');
+    $('sessionWindow').textContent = `場次 ${fmtTime(s.startsAt)}–${fmtTime(s.endsAt)}・簽到時段 ${fmtTime(w.from)}–${fmtTime(w.to)}`;
+    $('sessionCount').textContent = slotCount(s.id);
+  } else {
+    const next = nextSession(d);
+    nameEl.textContent = '目前不在簽到時間';
+    nameEl.classList.add('off');
+    $('sessionWindow').textContent = !EVENT ? '' : next ? `下一場「${next.name}」${fmtTime(windowOf(next).from)} 開始簽到` : '這個活動的簽到時段已全部結束';
+    $('sessionCount').textContent = '—';
+  }
+  const tc = $('todayCounts');
+  tc.innerHTML = '';
+  for (const x of SLOTS) {
+    const div = document.createElement('div');
+    div.textContent = `${x.name} ${slotCount(x.id)} 人`;
+    if (s && x.id === s.id) div.className = 'now';
+    tc.appendChild(div);
+  }
+  const pending = records.filter(r => !r.synced).length;
+  $('totalInfo').textContent = `這台裝置掃了 ${records.length} 筆` + (pending ? `・${pending} 筆還沒上傳` : records.length ? '・都已上傳' : '');
+  renderSync(pending);
+  const list = $('recentList');
+  list.innerHTML = '';
+  for (const r of records.slice(-8).reverse()) {
+    const li = document.createElement('li');
+    li.textContent = `${hms(new Date(r.ts))}　${r.name || sessionName(r.session)}　末三碼 ${last3(r.sid)}　${SOURCE_LABEL[r.src] || r.src}`;
+    list.appendChild(li);
+  }
+}
+
+/* ---------------- 匯出 CSV ---------------- */
+function csvCell(v) {
+  let s = v == null ? '' : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; // 避免 Excel 把內容當公式
+  if (/[",\r\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function toCSV(rows) { return '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n'; }
+function download(filename, text) {
+  downloadBlob(filename, new Blob([text], { type: 'text/csv;charset=utf-8' }));
+}
+function downloadBlob(filename, blob) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+function exportCSV() {
+  if (!records.length) { alert('目前沒有任何簽到紀錄。'); return; }
+  const d = new Date();
+  const stamp = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+  const sorted = records.slice().sort((a, b) => a.ts - b.ts);
+
+  const detail = [['學號', '日期', '時間', '場次', '來源', '原始條碼']];
+  for (const r of sorted) detail.push([r.sid, r.date, hms(new Date(r.ts)), r.name || sessionName(r.session), SOURCE_LABEL[r.src] || r.src, r.raw || '']);
+
+  // 彙整：每個學號一列；若資料跨多天，欄位會加上日期
+  const dates = [...new Set(sorted.map(r => r.date))].sort();
+  const sessionIds = SLOTS.map(s => s.id);
+  for (const r of sorted) if (!sessionIds.includes(r.session)) sessionIds.push(r.session);
+  const cols = [];
+  for (const date of dates) for (const sid of sessionIds) cols.push({ date, session: sid, label: (dates.length > 1 ? date + ' ' : '') + sessionName(sid) });
+  const bySid = new Map();
+  for (const r of sorted) {
+    if (!bySid.has(r.sid)) bySid.set(r.sid, new Set());
+    bySid.get(r.sid).add(r.date + '|' + r.session);
+  }
+  const summary = [['學號', ...cols.map(c => c.label), '簽到場數']];
+  for (const sid of [...bySid.keys()].sort()) {
+    const set = bySid.get(sid);
+    const marks = cols.map(c => set.has(c.date + '|' + c.session) ? '有' : '無');
+    summary.push([sid, ...marks, set.size]);
+  }
+
+  const title = EVENT ? EVENT.title : '活動';
+  download(`${title}簽到_這台裝置_明細_${stamp}.csv`, toCSV(detail));
+  setTimeout(() => download(`${title}簽到_這台裝置_彙整_${stamp}.csv`, toCSV(summary)), 600);
+  prefs.exportedCount = records.length; savePrefs();
+  render();
+}
+$('exportBtn').addEventListener('click', exportCSV);
+
+/* ---------------- 清除資料 ---------------- */
+$('clearBtn').addEventListener('click', () => {
+  const pending = records.filter(r => !r.synced).length;
+  if (pending) { alert(`還有 ${pending} 筆沒有上傳到網站，請等網路恢復、上傳完再清除。`); return; }
+  const n = records.length;
+  if (!confirm(`確定要清除這台裝置上的 ${n} 筆紀錄嗎？\n都已經上傳到網站了，清除只會刪掉這台裝置上的備份。`)) return;
+  if (!confirm('第二次確認：清除後無法復原，所有學號資料都會從這台裝置刪除。\n真的要清除嗎？')) return;
+  records = [];
+  recordIndex = new Set();
+  for (const k of lsKeys()) if (k.startsWith(CONFIG.storageKey) && k !== PREFS_KEY) lsRemove(k);
+  prefs.exportedCount = 0; savePrefs();
+  $('bannerStorage').classList.add('hidden');
+  render();
+  alert('已清除所有簽到資料。');
+});
+
+// 同一台裝置開了兩個分頁時，保持資料同步
+window.addEventListener('storage', e => { if (e.key === CONFIG.storageKey) { loadRecords(); render(); } });
+
+/* ---------------- 跟網站同步 ---------------- */
+// 掃到的紀錄先存在這台裝置，每幾秒上傳一次；斷網時累積著，連上網路自動補送。
+// 每筆紀錄有自己的編號（cid），重送也不會重複寫入。同一場同一個學號，網站只留第一筆。
+function newId() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+}
+const DEVICE_KEY = 'ncuacg-checkin-device';
+const DEVICE_ID = lsGet(DEVICE_KEY) || (() => { const id = newId(); lsSet(DEVICE_KEY, id); return id; })();
+const INFO_KEY = CONFIG.storageKey + '-info';
+
+function api(path) {
+  return `/api/checkin/scan/${encodeURIComponent(EVENT_ID)}/${path}?key=${encodeURIComponent(SCAN_KEY)}`;
+}
+
+let syncState = 'idle';   // idle | syncing | offline | denied
+let lastSyncAt = 0;
+
+function fatal(message) {
+  const b = $('bannerFatal');
+  b.textContent = '⚠ ' + message;
+  b.classList.remove('hidden');
+}
+
+function applyInfo(data, fromCache) {
+  EVENT = data.event;
+  const t = v => new Date(v).getTime();
+  SLOTS = data.slots.map(x => ({ id: x.id, name: x.name, startsAt: t(x.startsAt), endsAt: t(x.endsAt),
+    opensAt: t(x.opensAt), closesAt: t(x.closesAt), count: x.count }));
+  document.title = `${EVENT.title}・簽到`;
+  $('eventTitle').textContent = `${EVENT.title}・簽到`;
+  if (!fromCache) {
+    // 離線時重新整理也能用：把場次存在這台裝置
+    lsSet(INFO_KEY, JSON.stringify(data));
+    const skewMin = Math.round((Date.now() - new Date(data.serverTime).getTime()) / 60000);
+    const b = $('bannerClock');
+    b.textContent = `⚠ 這台裝置的時間跟網站差了 ${Math.abs(skewMin)} 分鐘，簽到時段會判斷錯，請到系統設定校正時間。`;
+    b.classList.toggle('hidden', Math.abs(skewMin) < 2);
+  }
+}
+
+async function loadInfo() {
+  try {
+    const res = await fetch(api(''), { cache: 'no-store' });
+    if (res.status === 403) {
+      syncState = 'denied';
+      fatal('掃描連結無效或已經重設，請跟負責人要新的連結。已經掃的資料還在這台裝置上。');
+      return;
+    }
+    if (!res.ok) throw new Error(res.status);
+    applyInfo(await res.json(), false);
+  } catch (e) {
+    if (!EVENT) fatal('連不上網站，也沒有這個活動的離線資料。第一次打開掃描頁一定要有網路。');
+  }
+  render();
+}
+
+function renderSync(pending) {
+  const b = $('bannerSync');
+  let text = '';
+  if (syncState === 'offline') text = `📴 目前離線：${pending} 筆存在這台裝置，連上網路會自動上傳。請不要清除瀏覽器資料。`;
+  else if (pending > 20) text = `⏳ 還有 ${pending} 筆等待上傳…`;
+  b.textContent = text;
+  b.classList.toggle('hidden', !text);
+}
+
+async function syncNow() {
+  if (!EVENT || syncState === 'syncing' || syncState === 'denied') return;
+  const pending = records.filter(r => !r.synced);
+  if (!pending.length) {
+    if (Date.now() - lastSyncAt > CONFIG.refreshIntervalMs) { lastSyncAt = Date.now(); loadInfo(); }
+    return;
+  }
+  syncState = 'syncing';
+  try {
+    for (let i = 0; i < pending.length; i += 100) {
+      const batch = pending.slice(i, i + 100);
+      const res = await fetch(api('records/'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          device: DEVICE_ID,
+          records: batch.map(r => ({ cid: r.cid, slot: r.session, sid: r.sid, raw: r.raw, src: r.src, ts: r.ts })),
+        }),
+      });
+      if (res.status === 403) {
+        syncState = 'denied';
+        fatal('掃描連結已經重設，紀錄傳不上去。請跟負責人要新連結，或按「匯出這台裝置的 CSV」交給負責人。');
+        return;
+      }
+      if (!res.ok) throw new Error(res.status);
+      const data = await res.json();
+      for (const r of batch) {
+        const result = data.results[r.cid];
+        if (result) { r.synced = true; r.server = result; }
+      }
+      applyInfo(data, false);
+    }
+    syncState = 'idle';
+    lastSyncAt = Date.now();
+  } catch (e) {
+    syncState = 'offline';
+  } finally {
+    saveRecords();
+    render();
+  }
+}
+setInterval(syncNow, CONFIG.syncIntervalMs);
+window.addEventListener('online', () => { if (syncState === 'offline') syncState = 'idle'; syncNow(); });
+
+/* ---------------- 螢幕常亮 ---------------- */
+async function keepAwake() {
+  try { if ('wakeLock' in navigator && document.visibilityState === 'visible') await navigator.wakeLock.request('screen'); }
+  catch (e) { /* 不支援就算了 */ }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') keepAwake(); });
+
+/* ---------------- 啟動 ---------------- */
+if (!EVENT_ID || !SCAN_KEY) {
+  fatal('請從網站「活動簽到」頁的「掃描連結」打開這一頁。');
+} else {
+  try { const cached = JSON.parse(lsGet(INFO_KEY) || 'null'); if (cached) applyInfo(cached, true); } catch (e) { /* ignore */ }
+  loadInfo().then(syncNow);
+}
+// 斷網時重新整理也打得開這一頁
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+loadRecords();
+render();
+setInterval(render, 1000);
+initAudio();
+keepAwake();
+focusScanner();
+updateScannerState();
+refreshCameraList().then(() => {
+  if (prefs.cameraOn !== false) startCamera();
+  else camMsg('鏡頭已關閉');
+});
+</script>
+</body>
+</html>

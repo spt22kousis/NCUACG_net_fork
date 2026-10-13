@@ -45,6 +45,8 @@ Thumbs.db
 # === Compiled static assets ===
 *.map
 *.min.js
+# 掃描頁的條碼辨識程式庫（從 barcoder demo 搬來的，沒有 npm 可以裝）
+!frontend/public/scan/vendor/*.min.js
 *.min.css
 
 # === Coverage / Test ===

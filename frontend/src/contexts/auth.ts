@@ -11,6 +11,7 @@ export interface User {
   role: 'superadmin' | 'admin' | 'member' | 'guest';
   songfestStaff?: boolean; // 幹部或之後某場歌謠祭的排歌組成員
   courseLead?: boolean;    // 幹部或社課負責人（可以發社課公告）
+  checkinManager?: boolean; // 幹部、社課負責人或排歌組（可以管理活動簽到）
 }
 
 export interface AuthContextType {

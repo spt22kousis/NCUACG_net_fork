@@ -44,6 +44,8 @@ urlpatterns = [
     path("api/club/", include("club.urls")),
     # 歌謠祭（舊曲清單、歷屆播放紀錄）
     path("api/songfest/", include("songfest.urls")),
+    # 活動簽到（掃描頁在前端的 public/scan/）
+    path("api/checkin/", include("checkin.urls")),
 ]
 
 # 開發時讓 Django 直接提供上傳檔案；DEBUG=False 時這行不會生效

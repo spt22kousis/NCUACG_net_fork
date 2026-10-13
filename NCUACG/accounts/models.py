@@ -37,7 +37,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     """
 
     # 幹部在 Django admin 可以完整管理的 app；其他 app（帳號等）只有超管能動
-    OFFICER_APP_LABELS = {"club", "event", "songfest"}
+    OFFICER_APP_LABELS = {"club", "event", "songfest", "checkin"}
 
     email = models.EmailField("email", unique=True)
     name = models.CharField("名稱", max_length=100)

@@ -23,7 +23,13 @@ export default function ClubLayout({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   // 社課負責人不一定是幹部，後端 /api/me/ 會另外告訴我們
   const canManage = Boolean(user?.courseLead) || user?.role === 'admin' || user?.role === 'superadmin';
-  const tabs = canManage ? [...TABS, ...LEAD_TABS] : TABS;
+  const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+  const tabs = [
+    ...TABS,
+    ...(canManage ? LEAD_TABS : []),
+    // 排歌組也能管歌謠祭的簽到，所以另外判斷
+    ...(isAdmin || user?.checkinManager ? [{ to: '/checkin', label: '活動簽到', end: false }] : []),
+  ];
   return (
     <div className="songfest-page">
       <Sidebar />

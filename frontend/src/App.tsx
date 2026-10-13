@@ -21,6 +21,7 @@ import LessonManage from './pages/club/LessonManage';
 import Calendar from './pages/club/Calendar';
 import Photos from './pages/club/Photos';
 import WorksManage from './pages/club/WorksManage';
+import Checkin, { CheckinDetail } from './pages/club/Checkin';
 // 共用 Context
 import { AuthProvider } from './contexts/AuthContext';
 import { ChatProvider } from './contexts/ChatContext';
@@ -58,6 +59,8 @@ export default function App() {
               <Route path="/club/lessons/manage" element={<LessonManage />} />
               <Route path="/club/lessons/:id" element={<LessonDetail />} />
               <Route path="/calendar" element={<Calendar />} />
+              <Route path="/checkin" element={<Checkin />} />
+              <Route path="/checkin/:id" element={<CheckinDetail />} />
               {/* --- AI 助理聊天頁 --- */}
               <Route path="/assistant" element={<AssistantChat />} />
               {/* 歌謠祭 */}

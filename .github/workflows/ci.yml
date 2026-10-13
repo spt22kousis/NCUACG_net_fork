@@ -27,7 +27,7 @@ jobs:
       - name: 檢查是否有忘記產生的 migration
         run: python manage.py makemigrations --check --dry-run
       - name: 後端測試
-        run: python manage.py test accounts club event songfest
+        run: python manage.py test accounts club event songfest checkin
 
   frontend:
     runs-on: ubuntu-latest

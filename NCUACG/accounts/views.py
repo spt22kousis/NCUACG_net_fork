@@ -35,6 +35,7 @@ class UserProfileView(APIView):
                 role = "admin"
 
             # 排歌組成員不一定是幹部，側邊欄的「管理歌單」要另外判斷
+            from checkin.rules import can_use_checkin
             from club.lessons import can_manage_lessons
             from songfest.submissions import is_songfest_staff
 
@@ -45,6 +46,8 @@ class UserProfileView(APIView):
                 "songfestStaff": is_songfest_staff(user),
                 # 社課負責人不一定是幹部，側邊欄的「管理社課公告」要另外判斷
                 "courseLead": can_manage_lessons(user),
+                # 幹部、社課負責人、排歌組可以管理活動簽到
+                "checkinManager": can_use_checkin(user),
             }
 
             # 注意：不要在這裡用 print() 輸出 emoji/中文，Windows 終端機 (cp950)

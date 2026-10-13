@@ -357,7 +357,7 @@ class ManageTests(SubmissionTestCase):
         self.client.force_login(self.officer)
         res = self.client.post(f"/admin/songfest/festival/{self.festival.id}/change/", {
             "name": self.festival.name, "date": self.festival.date.isoformat(), "kind": "hall", "is_published": "on",
-            "partner_name": "健行科大", "partner_limit": 10,
+            "partner_name": "健行科大", "partner_limit": 10, "request_limit": 3,
             "staff-TOTAL_FORMS": 2, "staff-INITIAL_FORMS": 1, "staff-MIN_NUM_FORMS": 0, "staff-MAX_NUM_FORMS": 1000,
             "staff-0-id": FestivalStaff.objects.get().id, "staff-0-festival": self.festival.id,
             "staff-0-user": self.staffer.id, "staff-0-role": "lead",

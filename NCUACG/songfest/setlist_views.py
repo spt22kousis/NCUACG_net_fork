@@ -37,6 +37,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from . import requests as rq
 from . import setlist as sl
 from .models import Festival, FestivalStaff, Session, SetlistEntry, Submission, Track
 from .submission_views import festival_info
@@ -62,13 +63,26 @@ def _track_stats(festival: Festival) -> dict[int, dict]:
     }
 
 
+def _board_requests(festival: Festival) -> dict:
+    """點歌清單（工作區的「線上點歌」）與採用數：排進任一時段就算採用。"""
+    from .request_views import _request_dicts, _requests_queryset
+
+    qs = _requests_queryset().filter(festival=festival).order_by("-vote_count", "created_at")
+    rows = _request_dicts(festival, None, qs, staff=True)
+    return {
+        "requests": rows,
+        "requestStats": {"adopted": sum(1 for r in rows if r["scheduledIn"]), "total": len(rows)},
+    }
+
+
 def _board(festival: Festival) -> dict:
     sl.ensure_sessions(festival)
     staff = FestivalStaff.objects.filter(festival=festival).select_related("user")
     return {
         "festival": {**festival_info(festival), "setlistPublic": festival.setlist_public},
         "staff": [{"id": s.user_id, "name": s.user.name, "role": s.get_role_display()} for s in staff],
-        **sl.build_board(festival, _track_stats(festival)),
+        **sl.build_board(festival, _track_stats(festival), rq.votes_by_key(festival)),
+        **_board_requests(festival),
     }
 
 

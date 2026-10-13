@@ -220,6 +220,7 @@ export default function Submit() {
     <SongfestLayout>
       <p className="sf-lead">
         報曲、繳交、窗歌都在這裡，取代原本的 Google 試算表回報串。報曲即視為同意遵守出曲規定，並服從排歌組的判定。
+        不知道剪什麼的話，可以參考<Link to="/songfest/requests">點歌頁的「徵剪輯」</Link>：大家想聽、還沒人剪過的歌。
       </p>
 
       {error && <p className="sf-error">載入失敗，請稍後再試。</p>}

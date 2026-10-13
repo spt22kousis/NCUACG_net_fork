@@ -92,10 +92,10 @@ export default function SongfestHome() {
             <strong>新曲投稿</strong>
             <span>報曲、繳交、回報串</span>
           </Link>
-          <div className="sf-card sf-link-card is-disabled" aria-disabled="true">
+          <Link to="/songfest/requests" className="sf-card sf-link-card">
             <strong>點歌系統</strong>
-            <span>即將推出</span>
-          </div>
+            <span>點想聽的歌、幫別人 +1、徵剪輯</span>
+          </Link>
         </div>
       </section>
 

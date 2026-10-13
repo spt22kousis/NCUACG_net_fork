@@ -7,7 +7,9 @@ from django.template.response import TemplateResponse
 from django.urls import path
 
 from .importers import SpreadsheetError, import_songfest
-from .models import Festival, FestivalStaff, Play, Session, SetlistEntry, Submission, SubmissionComment, Track
+from .models import (
+    Festival, FestivalStaff, Play, Session, SetlistEntry, SongRequest, Submission, SubmissionComment, Track,
+)
 
 
 class FestivalStaffInline(admin.TabularInline):
@@ -32,6 +34,7 @@ class FestivalAdmin(admin.ModelAdmin):
                        "partner_name", "partner_limit", "rules"),
         }),
         ("亂入曲", {"fields": ("guest_deadline", "guest_form_url", "guest_info")}),
+        ("點歌", {"fields": ("request_limit", "request_deadline")}),
     )
 
     def get_queryset(self, request):
@@ -178,3 +181,28 @@ class SessionAdmin(admin.ModelAdmin):
     list_display = ("festival", "name", "order", "start_time", "end_time", "target_seconds", "owner")
     list_filter = ("festival",)
     inlines = [SetlistEntryInline]
+
+
+@admin.register(SongRequest)
+class SongRequestAdmin(admin.ModelAdmin):
+    """點歌由社員在網站上點；後台只用來查看與刪除不當內容。"""
+
+    list_display = ("title", "song_source", "festival", "kind", "votes", "requested_by", "created_at")
+    list_filter = ("festival",)
+    search_fields = ("title", "song_source", "note")
+    readonly_fields = ("festival", "track", "requested_by", "created_at")
+    fields = ("festival", "track", "song_source", "visual_source", "title", "link", "note", "requested_by", "created_at")
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related("festival", "requested_by").annotate(_votes=Count("votes"))
+
+    def has_add_permission(self, request):
+        return False
+
+    @admin.display(description="種類")
+    def kind(self, obj):
+        return "舊曲" if obj.track_id else "徵剪輯"
+
+    @admin.display(description="票數", ordering="_votes")
+    def votes(self, obj):
+        return obj._votes

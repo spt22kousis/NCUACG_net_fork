@@ -1,5 +1,6 @@
 from django.urls import path
 
+from . import request_views as rv
 from . import setlist_views as st
 from . import submission_views as sv
 from . import views
@@ -11,6 +12,12 @@ urlpatterns = [
     path("tracks/", views.track_list, name="songfest_tracks"),
     path("tracks/groups/", views.track_groups, name="songfest_track_groups"),
     path("ranking/", views.ranking, name="songfest_ranking"),
+
+    # 點歌（request_views.py）
+    path("requests/", rv.request_list, name="songfest_requests"),
+    path("requests/wishes/", rv.wish_list, name="songfest_request_wishes"),
+    path("requests/<int:request_id>/", rv.request_detail, name="songfest_request_detail"),
+    path("requests/<int:request_id>/vote/", rv.request_vote, name="songfest_request_vote"),
 
     # 新曲投稿（submission_views.py）
     path("active/", sv.active_festival, name="songfest_active"),

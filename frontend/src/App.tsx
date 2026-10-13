@@ -8,13 +8,14 @@ import VerifyEmail from './pages/VerifyEmail';
 import Announcement from './pages/Announcement';
 import Club from './pages/Club';
 import Works from './pages/Works';
-import { ComingSoon, NotFound } from './pages/StatusPage';
+import { NotFound } from './pages/StatusPage';
 import SongfestHome from './pages/songfest/SongfestHome';
 import Library from './pages/songfest/Library';
 import { SetlistDetail, SetlistIndex } from './pages/songfest/Setlists';
 import Submit from './pages/songfest/Submit';
 import Guest from './pages/songfest/Guest';
 import Manage from './pages/songfest/Manage';
+import Requests from './pages/songfest/Requests';
 import Lessons, { LessonDetail } from './pages/club/Lessons';
 import LessonManage from './pages/club/LessonManage';
 import Calendar from './pages/club/Calendar';
@@ -67,8 +68,7 @@ export default function App() {
               <Route path="/songfest/submit" element={<Submit />} />
               <Route path="/songfest/guest" element={<Guest />} />
               <Route path="/songfest/manage" element={<Manage />} />
-              {/* 已放進導覽列、尚未完成的功能 */}
-              <Route path="/songfest/requests" element={<ComingSoon feature="點歌系統" />} />
+              <Route path="/songfest/requests" element={<Requests />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>

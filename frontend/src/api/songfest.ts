@@ -436,6 +436,7 @@ export interface SetlistEntry {
   note: string;
   lastPlayed: string | null;
   recentPlayCount: number | null;
+  requestVotes: number;    // 這首歌在這場的點歌票數（工作區的「有人點歌」）
   warnings: string[];
 }
 
@@ -485,6 +486,8 @@ export interface SetlistBoard {
   sessions: SetlistSession[];
   pool: PoolItem[];
   warnings: string[];
+  requests: SongRequest[];                          // 這場的點歌清單（線上點歌）
+  requestStats: { adopted: number; total: number }; // 點歌採用數：排進任一時段就算採用
 }
 
 export interface EntryInput {
@@ -593,4 +596,88 @@ export async function fetchMyLibraryConsent(): Promise<LibraryConsentItem[]> {
 
 export async function setLibraryConsent(submissionId: number, consent: boolean): Promise<void> {
   await api.post(`/songfest/submissions/${submissionId}/library-consent/`, { consent });
+}
+
+// ── 點歌（對應後端 NCUACG/songfest/request_views.py）────────────────────────
+
+export interface SongRequest {
+  id: number;
+  kind: 'old' | 'wish';    // old：歌單裡有的舊曲；wish：還沒人剪過（徵剪輯）
+  dvdCode: string | null;
+  songSource: string;
+  visualSource: string;
+  title: string;
+  editor: string;
+  duration: number | null;
+  lastPlayed: string | null;
+  recentPlayCount: number;
+  link: string;
+  note: string;
+  requestedBy: string;
+  votes: number;
+  voted: boolean;          // 我有沒有 +1（點歌的人自己也算一票）
+  isMine: boolean;
+  canDelete: boolean;
+  scheduledIn: string[];   // 排進哪些時段；歌單公布前只有排歌組看得到
+  submitted: boolean;      // 徵剪輯：已經有人報了
+  createdAt: string;
+}
+
+export interface RequestFestival {
+  id: number;
+  name: string;
+  date: string;
+  open: boolean;
+  deadline: string | null;
+  limit: number;
+  myCount: number;
+  isStaff: boolean;
+}
+
+export interface RequestList {
+  festival: RequestFestival | null; // 沒有準備中的歌謠祭時是 null
+  requests: SongRequest[];
+}
+
+export interface Wish {
+  songSource: string;
+  visualSource: string;
+  title: string;
+  link: string;
+  note: string;
+  votes: number;
+  lastFestival: string;
+}
+
+export interface RequestInput {
+  festival?: number;
+  dvdCode?: string;
+  songSource?: string;
+  visualSource?: string;
+  title?: string;
+  link?: string;
+  note?: string;
+}
+
+/** 沒給 festivalId 就是目前在準備的那一場 */
+export async function fetchRequests(festivalId?: number): Promise<RequestList> {
+  return (await api.get<RequestList>('/songfest/requests/', { params: festivalId ? { festival: festivalId } : undefined })).data;
+}
+
+/** 點歌；已經有人點過同一首就變成 +1（created 是 false） */
+export async function createRequest(input: RequestInput): Promise<{ request: SongRequest; created: boolean; festival: RequestFestival }> {
+  return (await api.post('/songfest/requests/', input)).data;
+}
+
+export async function voteRequest(id: number, vote: boolean): Promise<{ votes: number; voted: boolean }> {
+  const url = `/songfest/requests/${id}/vote/`;
+  return (await (vote ? api.post(url) : api.delete(url))).data;
+}
+
+export async function deleteRequest(id: number): Promise<void> {
+  await api.delete(`/songfest/requests/${id}/`);
+}
+
+export async function fetchWishes(): Promise<Wish[]> {
+  return (await api.get<Wish[]>('/songfest/requests/wishes/')).data;
 }

@@ -58,7 +58,7 @@ const menuOptions: Option[] = [
       { name: '新曲投稿', requirement: 'public' },
       { name: '亂入投稿說明/投票', requirement: 'public' },
       { name: '歌單瀏覽', requirement: 'public' },
-      { name: '點歌系統', requirement: 'member' },
+      { name: '點歌系統', requirement: 'public' },
       { name: '管理歌單', requirement: 'songfestStaff' }
     ]
   },

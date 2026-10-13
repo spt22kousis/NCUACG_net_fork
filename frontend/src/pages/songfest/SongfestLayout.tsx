@@ -10,6 +10,7 @@ const TABS = [
   { to: '/songfest', label: '首頁', end: true },
   { to: '/songfest/library', label: '舊曲清單', end: false },
   { to: '/songfest/setlists', label: '歌單瀏覽', end: false },
+  { to: '/songfest/requests', label: '點歌', end: false },
   { to: '/songfest/submit', label: '新曲投稿', end: false },
   { to: '/songfest/guest', label: '亂入投稿', end: false },
 ];

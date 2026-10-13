@@ -1661,3 +1661,154 @@ a.sf-link-card:hover {
     margin-left: 0;
   }
 }
+
+/* ── 點歌 ── */
+.sf-request-forms {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.sf-request-search {
+  width: 100%;
+}
+
+.sf-request-results {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  background-color: #FFFFFF;
+}
+
+.sf-request-results li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+}
+
+.sf-request-results li + li {
+  border-top: 1px solid #e5e7eb;
+}
+
+.sf-wish-form {
+  width: 100%;
+  margin: 0;
+  padding: 12px 0 0;
+}
+
+.sf-request-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sf-request {
+  display: flex;
+  gap: 14px;
+  padding: 12px 16px;
+}
+
+.sf-vote {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border: 2px solid #000000;
+  border-radius: 12px;
+  background-color: #FFFFFF;
+  color: #1f2937;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.sf-vote strong {
+  font-size: 1.25rem;
+  line-height: 1.1;
+}
+
+.sf-vote.is-voted {
+  background-color: #007bff;
+  color: #FFFFFF;
+}
+
+.sf-vote:disabled {
+  cursor: default;
+}
+
+.sf-vote:not(.is-voted):disabled {
+  opacity: 0.6;
+}
+
+.sf-vote:focus-visible {
+  outline: 3px solid #007bff;
+  outline-offset: 2px;
+}
+
+.sf-request-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sf-request-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 13px;
+}
+
+.sf-request-note {
+  margin: 0;
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+
+.sf-request-meta .sf-tag {
+  margin-left: 0;
+  background-color: #FFF8DB; /* 舊曲：工作區的黃色 */
+}
+
+.sf-request-meta .sf-tag.is-wish {
+  background-color: #EDE9FE;
+}
+
+.sf-request-meta .sf-tag.is-done {
+  background-color: #DCFCE7;
+}
+
+/* 排歌台的點歌清單與「有人點歌」標記（工作區用藍色） */
+.sf-pool-requests-title {
+  margin-top: 16px !important;
+}
+
+.sf-pool-row.is-request {
+  cursor: default;
+  background-color: #EFF6FF;
+}
+
+.sf-pool-row.is-adopted {
+  opacity: 0.65;
+}
+
+.sf-request-adopted {
+  color: #166534;
+  font-weight: 600;
+}
+
+.sf-kind.is-requested {
+  background-color: #BFDBFE;
+}

@@ -6,8 +6,9 @@ import {
   addEntry, apiErrorMessage, autoDistribute, deleteEntry, downloadSetlist, fetchFillSuggestions, fetchSetlist,
   fetchTracks, formatDuration, formatLongDuration, parseDuration, publishSetlist, updateEntry, updateSession,
   type CustomType, type PoolItem, type SetlistBoard as Board, type SetlistEntry, type SetlistExport,
-  type SetlistSession, type Track,
+  type SetlistSession, type SongRequest, type Track,
 } from '../../api/songfest';
+import { Link } from 'react-router-dom';
 
 type DragPayload = { entryId: number } | { submissionId: number };
 
@@ -154,6 +155,22 @@ export default function SetlistBoard({ festivalId }: BoardProps) {
               ))}
             </>
           )}
+
+          <h3 className="sf-pool-requests-title">
+            點歌（採用 {board.requestStats.adopted}/{board.requestStats.total}）
+          </h3>
+          <p className="sf-hint">
+            社員在<Link to="/songfest/requests">點歌</Link>頁點的歌，依票數排序；排進任一時段就算採用。徵剪輯是歌單裡還沒有的歌，只能參考。
+          </p>
+          {board.requests.length === 0 && <p className="sf-muted">還沒有人點歌。</p>}
+          {board.requests.map(req => (
+            <RequestPoolRow
+              key={req.id}
+              req={req}
+              sessions={board.sessions}
+              onAdd={sid => run(() => addEntry(sid, { kind: 'old', dvdCode: req.dvdCode ?? '' }))}
+            />
+          ))}
         </aside>
 
         <div className="sf-sessions">
@@ -188,6 +205,32 @@ function PoolRow({ item, sessions, onAdd }: { item: PoolItem; sessions: SetlistS
         </select>
         <button type="button" className="sf-button" onClick={() => onAdd(target)}>加入</button>
       </div>
+    </div>
+  );
+}
+
+function RequestPoolRow({ req, sessions, onAdd }: { req: SongRequest; sessions: SetlistSession[]; onAdd: (sessionId: number) => void }) {
+  const [target, setTarget] = useState(sessions.find(s => !s.isTest)?.id ?? sessions[0]?.id ?? 0);
+  return (
+    <div className={`sf-pool-row is-request${req.scheduledIn.length ? ' is-adopted' : ''}`}>
+      <div className="sf-song-line">
+        <strong>〈{req.title}〉</strong>
+        <span>
+          {req.votes} 票 · {req.kind === 'old'
+            ? `${req.dvdCode} · ${formatDuration(req.duration)} · 上次 ${req.lastPlayed ?? '沒播過'}`
+            : `徵剪輯${req.submitted ? '（有人報了）' : ''}`}
+        </span>
+        {req.note && <span>「{req.note}」</span>}
+        {req.scheduledIn.length > 0 && <span className="sf-request-adopted">已排進 {req.scheduledIn.join('、')}</span>}
+      </div>
+      {req.kind === 'old' && (
+        <div className="sf-pool-actions">
+          <select value={target} onChange={e => setTarget(Number(e.target.value))} aria-label={`〈${req.title}〉要加到哪個時段`}>
+            {sessions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <button type="button" className="sf-button" onClick={() => onAdd(target)}>加入</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -316,6 +359,9 @@ function EntryRow({ entry, session, board, festivalId, busy, run, onDrop }: Entr
           {detail && <span>{detail}</span>}
         </div>
         <span className={`sf-kind is-${entry.kind}${entry.source ? ` is-${entry.source}` : ''}`}>{entry.sourceLabel}</span>
+        {entry.requestVotes > 0 && (
+          <span className="sf-kind is-requested" title="有人點歌（工作區的藍色標記）">點歌 {entry.requestVotes}</span>
+        )}
         <span className="sf-entry-time">
           {entry.duration ? formatDuration(entry.duration) : '沒長度'}
           <small>{entry.endsAt.slice(0, 5)} 播完</small>

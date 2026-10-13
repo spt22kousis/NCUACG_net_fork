@@ -55,6 +55,10 @@ class Festival(models.Model):
     # 排歌台排好的歌單要不要公開在「歌單瀏覽」（通常是活動當天或前一天公布）
     setlist_public = models.BooleanField("公開排好的歌單", default=False)
 
+    # 點歌：社員點想聽的舊曲，或還沒人剪過的歌（徵剪輯），排歌組排歌時參考
+    request_limit = models.PositiveSmallIntegerField("每人點歌上限", default=3, help_text="+1 不算在內")
+    request_deadline = models.DateTimeField("點歌截止", null=True, blank=True, help_text="沒填就開放到活動前一天")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -80,6 +84,15 @@ class Festival(models.Model):
     def previous_hall_festival(self):
         """上一場大講堂歌謠祭：罰則「下次歌謠祭禁止報曲」與「上一場播過」都以它為準。"""
         return Festival.objects.filter(kind="hall", date__lt=self.date).order_by("-date").first()
+
+    def is_request_open(self, now=None) -> bool:
+        """還能不能點歌：只有大講堂場（KTV 場是當天點歌）。"""
+        now = now or timezone.now()
+        if self.kind != "hall" or not self.is_published:
+            return False
+        if self.request_deadline:
+            return now <= self.request_deadline
+        return timezone.localtime(now).date() < self.date
 
     @classmethod
     def active(cls):
@@ -481,3 +494,55 @@ class SetlistEntry(models.Model):
         if self.kind == "old":
             return self.track.duration_seconds
         return self.custom_duration
+
+
+class SongRequest(models.Model):
+    """
+    點歌：對應工作區的「線上點歌」分頁。每一場各自一份，同一首歌（歌曲出處 + 曲名）在同一場只有一筆，
+    別人再點就是 +1。點的是歌單裡已經有的歌就連到舊曲；還沒有的歌就是「徵剪輯」，給大家報曲時參考。
+    """
+
+    festival = models.ForeignKey(Festival, on_delete=models.CASCADE, related_name="requests", verbose_name="場次")
+    # 舊曲清單重新匯入時舊曲可能被刪掉，所以歌曲資料另外存一份
+    track = models.ForeignKey(
+        Track, on_delete=models.SET_NULL, null=True, blank=True, related_name="requests", verbose_name="舊曲",
+    )
+    song_source = models.CharField("歌曲出處", max_length=255)
+    visual_source = models.CharField("畫面出處", max_length=255, blank=True)
+    title = models.CharField("曲名", max_length=255)
+    link = models.URLField("歌曲連結", blank=True, help_text="還沒人剪過的歌，附上連結方便大家找")
+    note = models.CharField("備註", max_length=200, blank=True)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="song_requests", verbose_name="點歌者",
+    )
+    song_key = models.CharField(max_length=255, db_index=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["festival", "song_key"], name="unique_request_per_song"),
+        ]
+        verbose_name = "點歌"
+        verbose_name_plural = "點歌"
+
+    def __str__(self) -> str:
+        return f"{self.festival.name}：〈{self.title}〉"
+
+    def save(self, *args, **kwargs):
+        self.song_key = song_key(self.song_source, self.title)
+        super().save(*args, **kwargs)
+
+
+class SongRequestVote(models.Model):
+    """點歌的 +1。點歌的人自己也算一票。"""
+
+    request = models.ForeignKey(SongRequest, on_delete=models.CASCADE, related_name="votes")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="song_request_votes")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["request", "user"], name="unique_request_vote"),
+        ]

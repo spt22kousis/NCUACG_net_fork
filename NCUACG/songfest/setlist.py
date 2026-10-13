@@ -71,8 +71,12 @@ def _entry_key(entry: SetlistEntry) -> str | None:
     return song_key(entry.song_source, entry.title)
 
 
-def build_board(festival: Festival, track_stats: dict[int, dict]) -> dict:
-    """排歌台需要的全部資料：各時段（含時刻表與提醒）、還沒排的新曲、整體提醒。"""
+def build_board(festival: Festival, track_stats: dict[int, dict], request_votes: dict[str, int] | None = None) -> dict:
+    """
+    排歌台需要的全部資料：各時段（含時刻表與提醒）、還沒排的新曲、整體提醒。
+    request_votes：每首歌（song_key）在這場的點歌票數，工作區的「有人點歌」。
+    """
+    request_votes = request_votes or {}
     sessions = list(festival.sessions.select_related("owner"))
     entries = _entries(festival)
     by_session = defaultdict(list)
@@ -137,6 +141,7 @@ def build_board(festival: Festival, track_stats: dict[int, dict]) -> dict:
                 "note": e.note,
                 "lastPlayed": stats.get("lastPlayed"),
                 "recentPlayCount": stats.get("recentPlayCount"),
+                "requestVotes": request_votes.get(key, 0) if key else 0,
                 "warnings": warnings,
             })
 
